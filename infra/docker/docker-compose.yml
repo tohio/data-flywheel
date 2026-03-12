@@ -1,0 +1,160 @@
+services:
+
+  # ── Orchestrator API ──────────────────────────────────────────────────────
+  orchestrator:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.orchestrator
+    container_name: flywheel-orchestrator
+    ports:
+      - "8000:8000"
+    env_file: ../../.env
+    environment:
+      - ENV=development
+    volumes:
+      - ../../orchestrator:/app/orchestrator   # live reload in dev
+      - ../../configs:/app/configs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flywheel
+
+  # ── Celery Worker ─────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: flywheel-worker
+    env_file: ../../.env
+    environment:
+      - ENV=development
+    volumes:
+      - ../../orchestrator:/app/orchestrator   # live reload in dev
+      - ../../configs:/app/configs
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flywheel
+
+  # ── MongoDB ───────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: flywheel-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - flywheel
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: flywheel-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - flywheel
+
+  # ── Elasticsearch ─────────────────────────────────────────────────────────
+  elasticsearch:
+    image: elasticsearch:8.12.2
+    container_name: flywheel-elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false       # dev only — no auth
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - flywheel
+
+  # ── MLflow ────────────────────────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.22.0
+    container_name: flywheel-mlflow
+    ports:
+      - "5000:5000"
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri mongodb://mongodb:27017/mlflow
+      --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flywheel
+
+# ── Volumes ───────────────────────────────────────────────────────────────
+volumes:
+  mongodb_data:
+  redis_data:
+  elasticsearch_data:
+  mlflow_artifacts:
+
+# ── Networks ──────────────────────────────────────────────────────────────
+networks:
+  flywheel:
+    driver: bridge
+
+  # ── Celery Beat (scheduler) ─────────────────────────────────────────────
+  beat:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: flywheel-beat
+    env_file: ../../.env
+    environment:
+      - ENV=development
+    volumes:
+      - ../../orchestrator:/app/orchestrator
+      - ../../configs:/app/configs
+    command: >
+      celery -A orchestrator.core.celery_app beat
+      --loglevel=info
+      --scheduler celery.beat.PersistentScheduler
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flywheel

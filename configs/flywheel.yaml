@@ -1,0 +1,19 @@
+# Flywheel loop schedule and data thresholds
+
+schedule:
+  cron: "0 */6 * * *"     # Run every 6 hours
+  min_new_logs: 500        # Skip cycle if fewer new logs than this
+
+curation:
+  min_quality_score: 0.7   # 0.0–1.0, heuristic quality filter
+  max_token_length: 2048
+  dedup_threshold: 0.85    # MinHash similarity — above this = duplicate
+  remove_pii: true
+  min_response_length: 20  # Filter out trivially short responses
+
+experiments:
+  run_icl: true            # In-context learning (no fine-tuning)
+  run_lora_sft: true       # LoRA supervised fine-tuning
+  icl_num_examples: 8      # Few-shot examples to include in ICL prompt
+  lora_max_steps: 500
+  lora_batch_size: 8

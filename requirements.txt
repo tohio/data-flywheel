@@ -1,0 +1,38 @@
+# API
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# Task queue
+celery==5.4.0
+redis==5.1.0
+
+# Databases
+pymongo==4.9.1
+motor==3.6.0
+elasticsearch==8.15.1
+
+# ML / model APIs
+groq==0.11.0
+huggingface-hub==0.25.0
+transformers==4.45.0
+datasets==3.0.1
+trl==0.11.1
+peft==0.13.0
+
+# Evaluation
+deepeval==1.4.2
+
+# Experiment tracking
+mlflow==2.22.0
+
+# Data processing
+datasketch==1.6.5    # MinHash dedup
+presidio-analyzer==2.2.355  # PII detection
+structlog==24.4.0    # structured logging
+
+# Utils
+pyyaml==6.0.2
+python-dotenv==1.0.1
+httpx==0.27.2

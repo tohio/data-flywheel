@@ -1,0 +1,388 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 820" width="1500" height="820">
+  <defs>
+    <filter id="glow-orange" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+
+    <marker id="arr-gray" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#4B5563"/>
+    </marker>
+    <marker id="arr-orange" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#F97316"/>
+    </marker>
+    <marker id="arr-green" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#22C55E"/>
+    </marker>
+    <marker id="arr-teal" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#06B6D4"/>
+    </marker>
+    <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#A855F7"/>
+    </marker>
+    <marker id="arr-amber" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#F59E0B"/>
+    </marker>
+    <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#3B82F6"/>
+    </marker>
+
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0D1117"/>
+      <stop offset="100%" style="stop-color:#080C12"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#161B22"/>
+      <stop offset="100%" style="stop-color:#0D1117"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1C2333"/>
+      <stop offset="100%" style="stop-color:#141A24"/>
+    </linearGradient>
+    <linearGradient id="og" x1="0%" y1="0%" x2="135%" y2="135%">
+      <stop offset="0%" style="stop-color:#FB923C"/>
+      <stop offset="100%" style="stop-color:#C2410C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="820" fill="url(#bg)"/>
+
+  <!-- Grid -->
+  <g opacity="0.025" stroke="#E6EDF3" stroke-width="0.5">
+    <line x1="0" y1="100" x2="1500" y2="100"/><line x1="0" y1="200" x2="1500" y2="200"/>
+    <line x1="0" y1="300" x2="1500" y2="300"/><line x1="0" y1="400" x2="1500" y2="400"/>
+    <line x1="0" y1="500" x2="1500" y2="500"/><line x1="0" y1="600" x2="1500" y2="600"/>
+    <line x1="0" y1="700" x2="1500" y2="700"/>
+    <line x1="100" y1="0" x2="100" y2="820"/><line x1="200" y1="0" x2="200" y2="820"/>
+    <line x1="300" y1="0" x2="300" y2="820"/><line x1="400" y1="0" x2="400" y2="820"/>
+    <line x1="500" y1="0" x2="500" y2="820"/><line x1="600" y1="0" x2="600" y2="820"/>
+    <line x1="700" y1="0" x2="700" y2="820"/><line x1="800" y1="0" x2="800" y2="820"/>
+    <line x1="900" y1="0" x2="900" y2="820"/><line x1="1000" y1="0" x2="1000" y2="820"/>
+    <line x1="1100" y1="0" x2="1100" y2="820"/><line x1="1200" y1="0" x2="1200" y2="820"/>
+    <line x1="1300" y1="0" x2="1300" y2="820"/><line x1="1400" y1="0" x2="1400" y2="820"/>
+  </g>
+
+  <!-- ══════════════════════════════════════════════
+       TITLE
+  ══════════════════════════════════════════════ -->
+  <text x="750" y="40" text-anchor="middle" font-size="26" font-weight="700" fill="#E6EDF3" font-family="'SF Mono','Fira Code',monospace" letter-spacing="4">data-flywheel</text>
+  <text x="750" y="62" text-anchor="middle" font-size="10" fill="#4B5563" font-family="'SF Mono','Fira Code',monospace" letter-spacing="3">OPEN-SOURCE CONTINUOUS MODEL IMPROVEMENT PIPELINE</text>
+  <line x1="30" y1="74" x2="1470" y2="74" stroke="#21262D" stroke-width="1"/>
+
+  <!-- ══════════════════════════════════════════════
+       DEPLOYED APP PANEL  x=30 w=190
+  ══════════════════════════════════════════════ -->
+  <rect x="30" y="84" width="192" height="650" rx="10" fill="url(#panel)" stroke="#30363D" stroke-width="1.5"/>
+  <text x="126" y="108" text-anchor="middle" font-size="9" fill="#6B7280" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2">DEPLOYED APP</text>
+  <line x1="50" y1="116" x2="202" y2="116" stroke="#21262D" stroke-width="1"/>
+
+  <!-- App User -->
+  <circle cx="126" cy="164" r="30" fill="#0C1A2E" stroke="#3B82F6" stroke-width="1.5"/>
+  <circle cx="126" cy="153" r="11" fill="#2563EB"/>
+  <path d="M100,177 Q126,164 152,177" fill="#2563EB" opacity="0.85"/>
+  <text x="126" y="207" text-anchor="middle" font-size="10" fill="#93C5FD" font-family="'SF Mono','Fira Code',monospace">App User</text>
+
+  <line x1="126" y1="218" x2="126" y2="240" stroke="#374151" stroke-width="1.5" marker-end="url(#arr-gray)"/>
+
+  <!-- AI Agent -->
+  <rect x="92" y="246" width="68" height="54" rx="8" fill="#1C2333" stroke="#6B7280" stroke-width="1.5"/>
+  <text x="126" y="272" text-anchor="middle" font-size="20" fill="#9CA3AF" font-family="sans-serif">⊞</text>
+  <text x="126" y="288" text-anchor="middle" font-size="9" fill="#9CA3AF" font-family="'SF Mono','Fira Code',monospace">AI Agent</text>
+  <text x="126" y="314" text-anchor="middle" font-size="8" fill="#4B5563" font-family="'SF Mono','Fira Code',monospace">(production model)</text>
+
+  <line x1="126" y1="323" x2="126" y2="340" stroke="#374151" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <!-- TEACHER -->
+  <text x="126" y="358" text-anchor="middle" font-size="8.5" fill="#4B5563" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2">TEACHER</text>
+  <polygon points="126,375 150,388 150,414 126,427 102,414 102,388" fill="#0B1F0C" stroke="#22C55E" stroke-width="1.8"/>
+  <circle cx="126" cy="401" r="10" fill="#16A34A" opacity="0.3"/>
+  <circle cx="126" cy="401" r="5" fill="#4ADE80"/>
+  <text x="126" y="447" text-anchor="middle" font-size="9" fill="#4ADE80" font-family="'SF Mono','Fira Code',monospace">llama-3.3-70b</text>
+
+  <line x1="126" y1="458" x2="126" y2="470" stroke="#21262D" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <!-- PROMOTED -->
+  <text x="126" y="488" text-anchor="middle" font-size="8.5" fill="#4B5563" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2">PROMOTED</text>
+  <polygon points="126,505 150,518 150,544 126,557 102,544 102,518" fill="#031820" stroke="#06B6D4" stroke-width="1.8"/>
+  <circle cx="126" cy="531" r="10" fill="#0891B2" opacity="0.3"/>
+  <circle cx="126" cy="531" r="5" fill="#22D3EE"/>
+  <text x="126" y="577" text-anchor="middle" font-size="9" fill="#22D3EE" font-family="'SF Mono','Fira Code',monospace">llama-3.2-Xb</text>
+  <text x="126" y="594" text-anchor="middle" font-size="8" fill="#0891B2" font-family="'SF Mono','Fira Code',monospace" font-style="italic">↑ update production</text>
+
+  <!-- ══════════════════════════════════════════════
+       LOG COMPLETIONS ARROW  App → ES
+  ══════════════════════════════════════════════ -->
+  <line x1="222" y1="300" x2="288" y2="300" stroke="#F97316" stroke-width="2.2" marker-end="url(#arr-orange)"/>
+  <text x="255" y="292" text-anchor="middle" font-size="9" fill="#F97316" font-family="'SF Mono','Fira Code',monospace">Log Completions</text>
+
+  <!-- ══════════════════════════════════════════════
+       ELASTICSEARCH  x=290
+  ══════════════════════════════════════════════ -->
+  <rect x="290" y="258" width="118" height="94" rx="10" fill="url(#panel)" stroke="#F97316" stroke-width="2" filter="url(#shadow)"/>
+  <!-- cylinder -->
+  <ellipse cx="349" cy="282" rx="30" ry="11" fill="url(#og)"/>
+  <rect x="319" y="282" width="60" height="28" fill="#C2410C" opacity="0.8"/>
+  <ellipse cx="349" cy="310" rx="30" ry="11" fill="url(#og)"/>
+  <text x="349" y="342" text-anchor="middle" font-size="10" fill="#FB923C" font-family="'SF Mono','Fira Code',monospace">Elasticsearch</text>
+
+  <!-- ES → Orchestrator -->
+  <line x1="408" y1="305" x2="458" y2="305" stroke="#F97316" stroke-width="2.2" marker-end="url(#arr-orange)"/>
+
+  <!-- ══════════════════════════════════════════════
+       ORCHESTRATOR  x=460
+  ══════════════════════════════════════════════ -->
+  <rect x="460" y="252" width="124" height="110" rx="10" fill="url(#panel)" stroke="#F97316" stroke-width="2.2" filter="url(#glow-orange)"/>
+  <circle cx="522" cy="292" r="28" fill="#1A0C00" stroke="#F97316" stroke-width="1.5"/>
+  <text x="522" y="300" text-anchor="middle" font-size="24" fill="#F97316" font-family="sans-serif">⚙</text>
+  <text x="522" y="334" text-anchor="middle" font-size="10" font-weight="700" fill="#FB923C" font-family="'SF Mono','Fira Code',monospace">Orchestrator</text>
+  <text x="522" y="350" text-anchor="middle" font-size="8" fill="#78350F" font-family="'SF Mono','Fira Code',monospace">FastAPI · Celery</text>
+
+  <!-- ══════════════════════════════════════════════
+       ORCHESTRATOR → PLATFORM ARROWS
+       Clean right-angle routing
+  ══════════════════════════════════════════════ -->
+  <!-- To Curation (top): right then up then right -->
+  <polyline points="584,278 618,278 618,218 652,218" fill="none" stroke="#F59E0B" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arr-amber)"/>
+  <!-- To Experimentation (bottom): right then down then right -->
+  <polyline points="584,330 618,330 618,440 652,440" fill="none" stroke="#A855F7" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arr-purple)"/>
+
+  <!-- ══════════════════════════════════════════════
+       MAIN PLATFORM PANEL  x=620 w=720
+  ══════════════════════════════════════════════ -->
+  <rect x="620" y="86" width="726" height="662" rx="12" fill="url(#panel)" stroke="#3B82F6" stroke-width="2" opacity="0.97"/>
+  <text x="983" y="110" text-anchor="middle" font-size="9.5" fill="#60A5FA" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2.5">DATA FLYWHEEL PLATFORM</text>
+  <line x1="640" y1="120" x2="1326" y2="120" stroke="#1D2D40" stroke-width="1"/>
+
+  <!-- ── CURATION panel  x=636 y=130 w=310 h=200 ── -->
+  <rect x="636" y="130" width="310" height="200" rx="8" fill="url(#inner)" stroke="#F59E0B" stroke-width="1.4"/>
+  <text x="791" y="152" text-anchor="middle" font-size="9" fill="#F59E0B" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2">CURATION</text>
+  <line x1="652" y1="160" x2="930" y2="160" stroke="#1E1608" stroke-width="1"/>
+
+  <!-- Filter box -->
+  <rect x="648" y="168" width="126" height="146" rx="6" fill="#120D00" stroke="#F59E0B" stroke-width="1" opacity="0.8"/>
+  <text x="711" y="210" text-anchor="middle" font-size="28" fill="#F59E0B" font-family="sans-serif">▦</text>
+  <text x="711" y="238" text-anchor="middle" font-size="10" font-weight="700" fill="#FCD34D" font-family="'SF Mono','Fira Code',monospace">Filter Pipeline</text>
+  <text x="711" y="256" text-anchor="middle" font-size="8" fill="#92400E" font-family="'SF Mono','Fira Code',monospace">length · quality</text>
+  <text x="711" y="272" text-anchor="middle" font-size="8" fill="#92400E" font-family="'SF Mono','Fira Code',monospace">toxicity · PII</text>
+  <text x="711" y="290" text-anchor="middle" font-size="8" fill="#6B3800" font-family="'SF Mono','Fira Code',monospace">Presidio</text>
+
+  <!-- Filter → Dedup arrow -->
+  <line x1="774" y1="238" x2="794" y2="238" stroke="#F59E0B" stroke-width="1.6" marker-end="url(#arr-amber)"/>
+
+  <!-- Dedup box -->
+  <rect x="796" y="168" width="134" height="146" rx="6" fill="#120D00" stroke="#F59E0B" stroke-width="1" opacity="0.8"/>
+  <text x="863" y="210" text-anchor="middle" font-size="26" fill="#F59E0B" font-family="sans-serif">⊛</text>
+  <text x="863" y="238" text-anchor="middle" font-size="10" font-weight="700" fill="#FCD34D" font-family="'SF Mono','Fira Code',monospace">MinHash Dedup</text>
+  <text x="863" y="256" text-anchor="middle" font-size="8" fill="#92400E" font-family="'SF Mono','Fira Code',monospace">LSH · char</text>
+  <text x="863" y="272" text-anchor="middle" font-size="8" fill="#92400E" font-family="'SF Mono','Fira Code',monospace">5-grams</text>
+  <text x="863" y="290" text-anchor="middle" font-size="8" fill="#6B3800" font-family="'SF Mono','Fira Code',monospace">threshold: 0.85</text>
+
+  <!-- ── EVALUATION panel  x=962 y=130 w=366 h=200 ── -->
+  <rect x="962" y="130" width="366" height="200" rx="8" fill="url(#inner)" stroke="#3B82F6" stroke-width="1.4"/>
+  <text x="1145" y="152" text-anchor="middle" font-size="9" fill="#3B82F6" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2">EVALUATION</text>
+  <line x1="978" y1="160" x2="1312" y2="160" stroke="#0A1830" stroke-width="1"/>
+
+  <!-- LLM Judge -->
+  <rect x="974" y="168" width="156" height="146" rx="6" fill="#05101E" stroke="#3B82F6" stroke-width="1" opacity="0.8"/>
+  <circle cx="1052" cy="208" r="24" fill="#0C1A30" stroke="#3B82F6" stroke-width="1.2"/>
+  <text x="1052" y="216" text-anchor="middle" font-size="20" fill="#60A5FA" font-family="sans-serif">⚖</text>
+  <text x="1052" y="244" text-anchor="middle" font-size="10" font-weight="700" fill="#93C5FD" font-family="'SF Mono','Fira Code',monospace">LLM Judge</text>
+  <text x="1052" y="260" text-anchor="middle" font-size="8" fill="#1E40AF" font-family="'SF Mono','Fira Code',monospace">Groq · 70B</text>
+  <text x="1052" y="276" text-anchor="middle" font-size="8" fill="#1E40AF" font-family="'SF Mono','Fira Code',monospace">score 1–5</text>
+  <text x="1052" y="292" text-anchor="middle" font-size="8" fill="#1E3A8A" font-family="'SF Mono','Fira Code',monospace">win-rate</text>
+
+  <!-- Judge → Metrics arrow -->
+  <line x1="1130" y1="238" x2="1148" y2="238" stroke="#3B82F6" stroke-width="1.6" marker-end="url(#arr-blue)"/>
+
+  <!-- Metrics -->
+  <rect x="1150" y="168" width="162" height="146" rx="6" fill="#05101E" stroke="#3B82F6" stroke-width="1" opacity="0.8"/>
+  <text x="1231" y="208" text-anchor="middle" font-size="26" fill="#3B82F6" font-family="sans-serif">⏱</text>
+  <text x="1231" y="244" text-anchor="middle" font-size="10" font-weight="700" fill="#93C5FD" font-family="'SF Mono','Fira Code',monospace">Metrics</text>
+  <text x="1231" y="260" text-anchor="middle" font-size="8" fill="#1E40AF" font-family="'SF Mono','Fira Code',monospace">latency p50/95/99</text>
+  <text x="1231" y="276" text-anchor="middle" font-size="8" fill="#1E40AF" font-family="'SF Mono','Fira Code',monospace">cost per 1k tokens</text>
+  <text x="1231" y="292" text-anchor="middle" font-size="8" fill="#1E3A8A" font-family="'SF Mono','Fira Code',monospace">sample count</text>
+
+  <!-- Curation → Evaluation (horizontal arrow between panels) -->
+  <line x1="946" y1="228" x2="960" y2="228" stroke="#4B5563" stroke-width="1.8" marker-end="url(#arr-gray)"/>
+
+  <!-- ── EXPERIMENTATION panel  x=636 y=346 w=310 h=200 ── -->
+  <rect x="636" y="346" width="310" height="200" rx="8" fill="url(#inner)" stroke="#A855F7" stroke-width="1.4"/>
+  <text x="791" y="368" text-anchor="middle" font-size="9" fill="#A855F7" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2">EXPERIMENTATION</text>
+  <line x1="652" y1="376" x2="930" y2="376" stroke="#1A0830" stroke-width="1"/>
+
+  <!-- ICL box -->
+  <rect x="648" y="384" width="126" height="146" rx="6" fill="#0E0620" stroke="#A855F7" stroke-width="1" opacity="0.8"/>
+  <circle cx="711" cy="426" r="20" fill="#1A0835" stroke="#A855F7" stroke-width="1.2"/>
+  <circle cx="711" cy="426" r="8" fill="#7C3AED" opacity="0.5"/>
+  <circle cx="711" cy="426" r="3" fill="#C084FC"/>
+  <text x="711" y="462" text-anchor="middle" font-size="10" font-weight="700" fill="#D8B4FE" font-family="'SF Mono','Fira Code',monospace">ICL</text>
+  <text x="711" y="478" text-anchor="middle" font-size="8" fill="#6B21A8" font-family="'SF Mono','Fira Code',monospace">In-Context</text>
+  <text x="711" y="494" text-anchor="middle" font-size="8" fill="#6B21A8" font-family="'SF Mono','Fira Code',monospace">Learning</text>
+  <text x="711" y="512" text-anchor="middle" font-size="8" fill="#4C1D95" font-family="'SF Mono','Fira Code',monospace">zero compute</text>
+
+  <!-- ICL → LoRA arrow -->
+  <line x1="774" y1="450" x2="794" y2="450" stroke="#A855F7" stroke-width="1.6" marker-end="url(#arr-purple)"/>
+
+  <!-- LoRA box -->
+  <rect x="796" y="384" width="134" height="146" rx="6" fill="#0E0620" stroke="#A855F7" stroke-width="1" opacity="0.8"/>
+  <circle cx="863" cy="426" r="20" fill="#1A0835" stroke="#A855F7" stroke-width="1.2"/>
+  <circle cx="863" cy="426" r="11" fill="none" stroke="#A855F7" stroke-width="1"/>
+  <circle cx="863" cy="426" r="3" fill="#C084FC"/>
+  <text x="863" y="462" text-anchor="middle" font-size="10" font-weight="700" fill="#D8B4FE" font-family="'SF Mono','Fira Code',monospace">LoRA SFT</text>
+  <text x="863" y="478" text-anchor="middle" font-size="8" fill="#6B21A8" font-family="'SF Mono','Fira Code',monospace">HuggingFace</text>
+  <text x="863" y="494" text-anchor="middle" font-size="8" fill="#6B21A8" font-family="'SF Mono','Fira Code',monospace">AutoTrain</text>
+  <text x="863" y="512" text-anchor="middle" font-size="8" fill="#4C1D95" font-family="'SF Mono','Fira Code',monospace">A10G · no local GPU</text>
+
+  <!-- ── REGISTRY & PROMOTION panel  x=962 y=346 w=366 h=200 ── -->
+  <rect x="962" y="346" width="366" height="200" rx="8" fill="url(#inner)" stroke="#06B6D4" stroke-width="1.4"/>
+  <text x="1145" y="368" text-anchor="middle" font-size="9" fill="#06B6D4" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2">REGISTRY &amp; PROMOTION</text>
+  <line x1="978" y1="376" x2="1312" y2="376" stroke="#031C20" stroke-width="1"/>
+
+  <!-- Criteria Gate -->
+  <rect x="974" y="384" width="156" height="146" rx="6" fill="#021418" stroke="#06B6D4" stroke-width="1" opacity="0.8"/>
+  <rect x="1027" y="416" width="50" height="40" rx="3" fill="#0E3040" stroke="#06B6D4" stroke-width="1.2"/>
+  <rect x="1027" y="416" width="24" height="40" rx="3" fill="#06B6D4" opacity="0.6"/>
+  <text x="1052" y="474" text-anchor="middle" font-size="10" font-weight="700" fill="#67E8F9" font-family="'SF Mono','Fira Code',monospace">Criteria Gate</text>
+  <text x="1052" y="490" text-anchor="middle" font-size="8" fill="#0E7490" font-family="'SF Mono','Fira Code',monospace">acc ≥ 0.85</text>
+  <text x="1052" y="506" text-anchor="middle" font-size="8" fill="#0E7490" font-family="'SF Mono','Fira Code',monospace">lat p95 ≤ 800ms</text>
+  <text x="1052" y="521" text-anchor="middle" font-size="8" fill="#0C5A6A" font-family="'SF Mono','Fira Code',monospace">cost ≤ $0.02/1k</text>
+
+  <!-- Criteria → Registry arrow -->
+  <line x1="1130" y1="450" x2="1148" y2="450" stroke="#06B6D4" stroke-width="1.6" marker-end="url(#arr-teal)"/>
+
+  <!-- Model Registry -->
+  <rect x="1150" y="384" width="162" height="146" rx="6" fill="#021418" stroke="#06B6D4" stroke-width="1" opacity="0.8"/>
+  <polygon points="1231,408 1254,421 1254,447 1231,460 1208,447 1208,421" fill="#021A10" stroke="#22C55E" stroke-width="1.8"/>
+  <circle cx="1231" cy="434" r="7" fill="#16A34A" opacity="0.4"/>
+  <circle cx="1231" cy="434" r="3" fill="#4ADE80"/>
+  <text x="1231" y="478" text-anchor="middle" font-size="10" font-weight="700" fill="#67E8F9" font-family="'SF Mono','Fira Code',monospace">Model Registry</text>
+  <text x="1231" y="494" text-anchor="middle" font-size="8" fill="#0E7490" font-family="'SF Mono','Fira Code',monospace">MongoDB</text>
+  <text x="1231" y="510" text-anchor="middle" font-size="8" fill="#0E7490" font-family="'SF Mono','Fira Code',monospace">atomic promotion</text>
+  <text x="1231" y="524" text-anchor="middle" font-size="8" fill="#0C5A6A" font-family="'SF Mono','Fira Code',monospace">1 production model</text>
+
+  <!-- Experimentation → Promotion (horizontal arrow between panels) -->
+  <line x1="946" y1="444" x2="960" y2="444" stroke="#4B5563" stroke-width="1.8" marker-end="url(#arr-gray)"/>
+
+  <!-- Evaluation → Promotion (vertical arrow between rows) -->
+  <line x1="1145" y1="330" x2="1145" y2="344" stroke="#4B5563" stroke-width="1.8" marker-end="url(#arr-gray)"/>
+
+  <!-- ── INFRA strip ── -->
+  <line x1="636" y1="564" x2="1328" y2="564" stroke="#1D2D40" stroke-width="1" stroke-dasharray="4,4"/>
+  <text x="983" y="582" text-anchor="middle" font-size="8.5" fill="#374151" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2.5">INFRASTRUCTURE</text>
+
+  <rect x="644" y="592" width="118" height="44" rx="5" fill="#0D1117" stroke="#22C55E" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="703" y="610" text-anchor="middle" font-size="10" fill="#22C55E" font-family="sans-serif">◫</text>
+  <text x="703" y="626" text-anchor="middle" font-size="8.5" fill="#16A34A" font-family="'SF Mono','Fira Code',monospace">MongoDB</text>
+
+  <rect x="778" y="592" width="118" height="44" rx="5" fill="#0D1117" stroke="#F59E0B" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="837" y="610" text-anchor="middle" font-size="10" fill="#F59E0B" font-family="sans-serif">◫</text>
+  <text x="837" y="626" text-anchor="middle" font-size="8.5" fill="#D97706" font-family="'SF Mono','Fira Code',monospace">Elasticsearch</text>
+
+  <rect x="912" y="592" width="118" height="44" rx="5" fill="#0D1117" stroke="#EF4444" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="971" y="610" text-anchor="middle" font-size="10" fill="#EF4444" font-family="sans-serif">◫</text>
+  <text x="971" y="626" text-anchor="middle" font-size="8.5" fill="#DC2626" font-family="'SF Mono','Fira Code',monospace">Redis</text>
+
+  <rect x="1046" y="592" width="118" height="44" rx="5" fill="#0D1117" stroke="#A855F7" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="1105" y="610" text-anchor="middle" font-size="10" fill="#A855F7" font-family="sans-serif">◫</text>
+  <text x="1105" y="626" text-anchor="middle" font-size="8.5" fill="#9333EA" font-family="'SF Mono','Fira Code',monospace">MLflow</text>
+
+  <rect x="1180" y="592" width="118" height="44" rx="5" fill="#0D1117" stroke="#06B6D4" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="1239" y="610" text-anchor="middle" font-size="10" fill="#06B6D4" font-family="sans-serif">◫</text>
+  <text x="1239" y="626" text-anchor="middle" font-size="8.5" fill="#0891B2" font-family="'SF Mono','Fira Code',monospace">Groq API</text>
+
+  <!-- Celery Beat -->
+  <rect x="636" y="650" width="690" height="82" rx="8" fill="#0D0818" stroke="#A855F7" stroke-width="1.4"/>
+  <text x="981" y="674" text-anchor="middle" font-size="9" fill="#A855F7" font-family="'SF Mono','Fira Code',monospace" letter-spacing="2.5">CELERY BEAT  ·  SCHEDULER</text>
+  <text x="981" y="696" text-anchor="middle" font-size="9" fill="#581C87" font-family="'SF Mono','Fira Code',monospace">cron: "0 */6 * * *"  ·  min_new_logs: 500  ·  skips cycle if threshold not met</text>
+  <text x="981" y="716" text-anchor="middle" font-size="8.5" fill="#3B0764" font-family="'SF Mono','Fira Code',monospace">configs/flywheel.yaml</text>
+
+  <!-- Celery Beat → Orchestrator: clean path going LEFT out of platform, then up to orchestrator -->
+  <polyline points="636,691 592,691 592,307 584,307" fill="none" stroke="#A855F7" stroke-width="1.6" stroke-dasharray="5,3" marker-end="url(#arr-purple)"/>
+  <text x="606" y="686" text-anchor="middle" font-size="8" fill="#A855F7" font-family="'SF Mono','Fira Code',monospace" transform="rotate(-90,606,686)">trigger</text>
+
+  <!-- ══════════════════════════════════════════════
+       CANDIDATE MODELS PANEL  x=1366 w=114
+  ══════════════════════════════════════════════ -->
+  <rect x="1366" y="84" width="118" height="570" rx="10" fill="url(#panel)" stroke="#30363D" stroke-width="1.5"/>
+  <text x="1425" y="108" text-anchor="middle" font-size="9" fill="#6B7280" font-family="'SF Mono','Fira Code',monospace" letter-spacing="1">CANDIDATES</text>
+  <line x1="1382" y1="116" x2="1468" y2="116" stroke="#21262D" stroke-width="1"/>
+
+  <!-- Model 1 -->
+  <polygon points="1425,142 1448,155 1448,181 1425,194 1402,181 1402,155" fill="#0B1F0C" stroke="#22C55E" stroke-width="1.6"/>
+  <circle cx="1425" cy="168" r="5" fill="#4ADE80"/>
+  <text x="1425" y="210" text-anchor="middle" font-size="8.5" fill="#4ADE80" font-family="'SF Mono','Fira Code',monospace">llama-3.2-1b</text>
+
+  <!-- Model 2 -->
+  <polygon points="1425,230 1448,243 1448,269 1425,282 1402,269 1402,243" fill="#0B1F0C" stroke="#22C55E" stroke-width="1.6"/>
+  <circle cx="1425" cy="256" r="5" fill="#4ADE80"/>
+  <text x="1425" y="298" text-anchor="middle" font-size="8.5" fill="#4ADE80" font-family="'SF Mono','Fira Code',monospace">llama-3.2-3b</text>
+
+  <!-- Model 3 -->
+  <polygon points="1425,318 1448,331 1448,357 1425,370 1402,357 1402,331" fill="#0B1F0C" stroke="#22C55E" stroke-width="1.6"/>
+  <circle cx="1425" cy="344" r="5" fill="#4ADE80"/>
+  <text x="1425" y="386" text-anchor="middle" font-size="8.5" fill="#4ADE80" font-family="'SF Mono','Fira Code',monospace">llama-3.1-8b</text>
+
+  <!-- Model 4 -->
+  <polygon points="1425,406 1448,419 1448,445 1425,458 1402,445 1402,419" fill="#0B1F0C" stroke="#22C55E" stroke-width="1.6"/>
+  <circle cx="1425" cy="432" r="5" fill="#4ADE80"/>
+  <text x="1425" y="474" text-anchor="middle" font-size="8.5" fill="#4ADE80" font-family="'SF Mono','Fira Code',monospace">llama-3.1-70b</text>
+
+  <text x="1425" y="510" text-anchor="middle" font-size="16" fill="#374151" font-family="sans-serif">···</text>
+  <text x="1425" y="534" text-anchor="middle" font-size="8" fill="#374151" font-family="'SF Mono','Fira Code',monospace">configurable</text>
+  <text x="1425" y="550" text-anchor="middle" font-size="8" fill="#374151" font-family="'SF Mono','Fira Code',monospace">models.yaml</text>
+
+  <!-- ══════════════════════════════════════════════
+       CANDIDATE ↔ PLATFORM ARROWS
+       Clean horizontal connectors at right edge of platform
+  ══════════════════════════════════════════════ -->
+  <!-- Candidates → Experimentation (send models to train) -->
+  <line x1="1366" y1="256" x2="1330" y2="256" stroke="#22C55E" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arr-green)"/>
+  <line x1="1330" y1="256" x2="1330" y2="450" stroke="#22C55E" stroke-width="1.8" stroke-dasharray="5,3"/>
+  <line x1="1330" y1="450" x2="1328" y2="450" stroke="#22C55E" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arr-green)"/>
+
+  <!-- Candidates → Evaluation (send models to evaluate) -->
+  <line x1="1366" y1="344" x2="1344" y2="344" stroke="#3B82F6" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arr-blue)"/>
+  <line x1="1344" y1="344" x2="1344" y2="238" stroke="#3B82F6" stroke-width="1.8" stroke-dasharray="5,3"/>
+  <line x1="1344" y1="238" x2="1328" y2="238" stroke="#3B82F6" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arr-blue)"/>
+
+  <!-- ══════════════════════════════════════════════
+       FEEDBACK LOOP: Registry → Deployed App
+       Runs cleanly OUTSIDE all panels at the bottom
+  ══════════════════════════════════════════════ -->
+  <!-- Down from Registry, across the bottom, up to Promoted model -->
+  <polyline
+    points="1231,530  1231,752  126,752  126,620"
+    fill="none" stroke="#06B6D4" stroke-width="2" stroke-dasharray="7,4"
+    marker-end="url(#arr-teal)"/>
+  <text x="680" y="746" text-anchor="middle" font-size="9" fill="#06B6D4" font-family="'SF Mono','Fira Code',monospace" letter-spacing="1.5">UPDATE PRODUCTION MODEL</text>
+
+  <!-- ══════════════════════════════════════════════
+       LEGEND
+  ══════════════════════════════════════════════ -->
+  <rect x="30" y="756" width="580" height="34" rx="6" fill="#0D1117" stroke="#21262D" stroke-width="1"/>
+
+  <line x1="52" y1="773" x2="78" y2="773" stroke="#F97316" stroke-width="2"/>
+  <polygon points="78,769 78,777 84,773" fill="#F97316"/>
+  <text x="90" y="777" font-size="9" fill="#6B7280" font-family="'SF Mono','Fira Code',monospace">log flow</text>
+
+  <line x1="152" y1="773" x2="178" y2="773" stroke="#22C55E" stroke-width="2" stroke-dasharray="5,3"/>
+  <polygon points="178,769 178,777 184,773" fill="#22C55E"/>
+  <text x="190" y="777" font-size="9" fill="#6B7280" font-family="'SF Mono','Fira Code',monospace">model eval</text>
+
+  <line x1="262" y1="773" x2="288" y2="773" stroke="#06B6D4" stroke-width="2" stroke-dasharray="5,3"/>
+  <polygon points="288,769 288,777 294,773" fill="#06B6D4"/>
+  <text x="300" y="777" font-size="9" fill="#6B7280" font-family="'SF Mono','Fira Code',monospace">promote</text>
+
+  <line x1="362" y1="773" x2="388" y2="773" stroke="#A855F7" stroke-width="2" stroke-dasharray="5,3"/>
+  <polygon points="388,769 388,777 394,773" fill="#A855F7"/>
+  <text x="400" y="777" font-size="9" fill="#6B7280" font-family="'SF Mono','Fira Code',monospace">train trigger</text>
+
+  <line x1="474" y1="773" x2="500" y2="773" stroke="#4B5563" stroke-width="2"/>
+  <polygon points="500,769 500,777 506,773" fill="#4B5563"/>
+  <text x="512" y="777" font-size="9" fill="#6B7280" font-family="'SF Mono','Fira Code',monospace">internal flow</text>
+
+</svg>

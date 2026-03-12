@@ -1,0 +1,25 @@
+# Model registry — teacher and student candidates
+
+teacher:
+  provider: groq
+  model: llama-3.3-70b-versatile
+  role: judge_and_label        # Used for LLM-as-judge AND to label unlabeled logs
+
+candidates:
+  - id: llama-1b
+    provider: groq
+    model: llama-3.2-1b-preview
+    experiments: [icl, lora_sft]
+    target: low_cost           # Optimization target for this candidate
+
+  - id: llama-3b
+    provider: groq
+    model: llama-3.2-3b-preview
+    experiments: [icl, lora_sft]
+    target: balanced
+
+  - id: llama-8b
+    provider: groq
+    model: llama-3.1-8b-instant
+    experiments: [icl, lora_sft]
+    target: high_accuracy
