@@ -1,0 +1,51 @@
+# ─── Environment ──────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ─── Testing ──────────────────────────────────────────────
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# ─── Linting / Type checking ──────────────────────────────
+.ruff_cache/
+.mypy_cache/
+
+# ─── Jupyter ──────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ─── MLflow ───────────────────────────────────────────────
+mlruns/
+mlartifacts/
+
+# ─── Experiments / artifacts ──────────────────────────────
+experiments/*
+!experiments/.gitkeep
+
+# ─── Docker ───────────────────────────────────────────────
+.docker/
+
+# ─── OS ───────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
