@@ -111,7 +111,7 @@ python -m venv .venv
 source .venv/bin/activate        # Mac / Linux
 # .venv\Scripts\activate         # Windows
 
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
 cp .env.sample .env
 # Add your API keys to .env
 ```
@@ -126,7 +126,7 @@ uv venv
 source .venv/bin/activate        # Mac / Linux
 # .venv\Scripts\activate         # Windows
 
-uv pip install -r requirements.txt
+uv pip install -r requirements.txt -r requirements-dev.txt
 cp .env.sample .env
 # Add your API keys to .env
 ```
