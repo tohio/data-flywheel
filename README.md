@@ -2,6 +2,8 @@
 
 A self-improving AI pipeline that continuously refines language models using real production traffic. Curates inference logs, fine-tunes smaller candidate models, evaluates them against a teacher model, and promotes the best performer — automatically.
 
+Where a standard fine-tuning workflow requires manually curated datasets and scheduled retraining jobs, this system closes the loop — production traffic becomes training data, smaller models are continuously evaluated against a teacher, and the best candidate replaces the current production model without human intervention.
+
 Inspired by the [NVIDIA Data Flywheel Blueprint](https://build.nvidia.com/nvidia/build-an-enterprise-data-flywheel), built entirely on open-source tooling with no local GPU required.
 
 ![Architecture](docs/architecture.svg)
@@ -10,26 +12,13 @@ Inspired by the [NVIDIA Data Flywheel Blueprint](https://build.nvidia.com/nvidia
 
 ## Overview
 
-A data flywheel is a continuous improvement loop:
+A data flywheel is a continuous improvement loop where each cycle makes the next one better:
 
-```
-Production Traffic
-      │
-      ▼
-[1] Log Capture          inference logs → Elasticsearch
-      │
-      ▼
-[2] Data Curation        filter · dedup · quality score · PII redaction
-      │
-      ▼
-[3] Experimentation      ICL (zero compute) + LoRA SFT (HuggingFace AutoTrain)
-      │
-      ▼
-[4] Evaluation           LLM judge (Groq) · latency · cost
-      │
-      ├─► PASS → [5] Promote to production · archive previous
-      └─► FAIL → log result · await next cycle
-```
+1. **Ingest** — production inference logs accumulate in Elasticsearch
+2. **Curate** — filter, deduplicate, and quality-score the logs into a clean dataset
+3. **Experiment** — run ICL (zero compute) and LoRA SFT (HuggingFace AutoTrain) on candidate models
+4. **Evaluate** — LLM judge scores candidates against the teacher; latency and cost are measured
+5. **Promote** — candidates that pass all criteria replace the production model; others are logged and skipped
 
 The result: models that get cheaper and faster over time without sacrificing accuracy.
 
@@ -93,23 +82,54 @@ data-flywheel/
 
 ---
 
+## API Keys Required
+
+| Service | Purpose | Free Tier |
+|---|---|---|
+| Groq | Teacher model (Llama 3.3 70B) + LLM judge + candidate inference | Yes |
+| HuggingFace | LoRA SFT via AutoTrain — dataset upload + job submission | Yes |
+
+Get them here:
+- **Groq** → https://console.groq.com
+- **HuggingFace** → https://huggingface.co/settings/tokens
+
+---
+
 ## Getting Started
 
 **Prerequisites**
 - Docker + Docker Compose
 - Python 3.12+
-- [Groq API key](https://console.groq.com) — free tier works
-- [HuggingFace token](https://huggingface.co/settings/tokens) — for fine-tuning jobs
 
-**Installation**
+**Installation — pip**
 
 ```bash
 git clone https://github.com/tohio/data-flywheel
 cd data-flywheel
-bash infra/scripts/setup.sh
+
+python -m venv .venv
+source .venv/bin/activate        # Mac / Linux
+# .venv\Scripts\activate         # Windows
+
+pip install -r requirements.txt
+cp .env.sample .env
+# Add your API keys to .env
 ```
 
-`setup.sh` checks prerequisites, creates `.env`, installs dependencies, starts all services, and waits for the API to be healthy.
+**Installation — uv**
+
+```bash
+git clone https://github.com/tohio/data-flywheel
+cd data-flywheel
+
+uv venv
+source .venv/bin/activate        # Mac / Linux
+# .venv\Scripts\activate         # Windows
+
+uv pip install -r requirements.txt
+cp .env.sample .env
+# Add your API keys to .env
+```
 
 **Add your API keys**
 
@@ -117,6 +137,12 @@ bash infra/scripts/setup.sh
 # Edit .env:
 GROQ_API_KEY=...
 HF_TOKEN=...
+```
+
+**Start services**
+
+```bash
+make up
 ```
 
 **Run the flywheel**
@@ -165,7 +191,20 @@ bash infra/scripts/reset.sh   # wipe all local state and volumes
 
 ---
 
-## Configuration
+## Evaluation
+
+Each flywheel cycle produces a full evaluation report logged to MLflow:
+
+- **Accuracy** — LLM judge win-rate: fraction of candidate responses scoring ≥ 4/5 against the teacher
+- **Latency** — p50, p95, and p99 response times measured over the eval sample
+- **Cost** — total and per-1k-token cost at Groq pricing for each candidate model
+- **Sample size** — number of eval samples used (minimum 100 required for promotion)
+
+Results are compared against thresholds in `configs/eval_criteria.yaml`. Candidates that pass all four are promoted; those that fail are archived with a per-criterion failure reason. The `notebooks/evaluation_analysis.ipynb` notebook visualises score distributions and accuracy vs latency vs cost tradeoffs across runs.
+
+---
+
+## Customization
 
 ### `configs/models.yaml` — define teacher and candidates
 
