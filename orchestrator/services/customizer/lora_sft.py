@@ -330,6 +330,14 @@ class LoRASFTService:
         tokenizer.save_pretrained(output_dir)
 
         logger.info("lora_training_complete", output_dir=output_dir, steps=max_steps)
+
+        # ── Free GPU memory ───────────────────────────────────────────────
+        del trainer
+        del model
+        if device == "cuda":
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+
         return output_dir
 
     # ── Helpers ───────────────────────────────────────────────────────────
