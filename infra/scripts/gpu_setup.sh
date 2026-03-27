@@ -42,13 +42,16 @@ if command -v docker &>/dev/null; then
     echo -e "${GREEN}✓ Docker already installed${NC}"
 else
     curl -fsSL https://get.docker.com | sh
-    sudo usermod -aG docker $USER
+    # Add current user to docker group if possible
+    sudo usermod -aG docker "$(whoami)" 2>/dev/null || true
+    # Start Docker — works on both systemd and non-systemd (Colab)
+    sudo systemctl start docker 2>/dev/null || sudo service docker start 2>/dev/null || true
     echo -e "${GREEN}✓ Docker installed${NC}"
 fi
 
 # ── Install NVIDIA Container Toolkit ─────────────────────────────────────
 echo -e "\n${YELLOW}Installing NVIDIA Container Toolkit...${NC}"
-if dpkg -l | grep -q nvidia-container-toolkit; then
+if dpkg -l | grep -q nvidia-container-toolkit 2>/dev/null; then
     echo -e "${GREEN}✓ NVIDIA Container Toolkit already installed${NC}"
 else
     curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
@@ -60,7 +63,8 @@ else
     sudo apt-get update -qq
     sudo apt-get install -y nvidia-container-toolkit
     sudo nvidia-ctk runtime configure --runtime=docker
-    sudo systemctl restart docker
+    # Restart Docker — works on both systemd and non-systemd
+    sudo systemctl restart docker 2>/dev/null || sudo service docker restart 2>/dev/null || true
     echo -e "${GREEN}✓ NVIDIA Container Toolkit installed${NC}"
 fi
 
