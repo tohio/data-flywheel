@@ -1,266 +1,219 @@
 """
-benchmarks.py
--------------
-Orchestrates a full evaluation run for a given experiment.
-Combines LLM judge scoring and latency/cost metrics, then logs
-everything to MLflow. No external eval framework required.
-"""
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
-import mlflow
+LLMJudge
+--------
+Uses Groq (Llama 3.3 70B) as an automated judge to score candidate
+model responses against teacher model responses.
 
-from orchestrator.services.evaluator.judge import LLMJudge, JudgeSummary
-from orchestrator.services.evaluator.metrics import MetricsCollector, MetricsSummary
+Scoring approach:
+  For each sample in the eval set:
+    1. Get teacher response (Llama 3.3 70B) — ground truth
+    2. Get candidate response (base or LoRA-adapted model)
+    3. Ask judge to score candidate vs teacher on a 1-5 scale
+    4. Aggregate into a win-rate / accuracy score
+
+The judge prompt is designed to be position-unbiased and
+criterion-specific (factual accuracy, completeness, coherence).
+"""
+import time
+from dataclasses import dataclass, field
+from typing import Any
+
+from groq import Groq
+
+from orchestrator.core.config import settings
 from orchestrator.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+_JUDGE_SYSTEM_PROMPT = """You are an impartial AI evaluator. Your task is to compare two responses to the same prompt and score the Candidate response relative to the Reference response.
+
+Score the Candidate on a scale of 1-5:
+  5 - Equivalent or better than Reference: fully accurate, complete, and coherent
+  4 - Mostly equivalent: minor omissions or wording differences only
+  3 - Partially equivalent: correct direction but missing key details
+  2 - Weak: significant inaccuracies or missing important content
+  1 - Poor: incorrect, incoherent, or completely off-topic
+
+Respond with ONLY a JSON object in this exact format:
+{"score": <1-5>, "reason": "<one sentence explanation>"}"""
+
+_JUDGE_USER_TEMPLATE = """Prompt: {prompt}
+
+Reference response: {reference}
+
+Candidate response: {candidate}
+
+Score the Candidate response."""
+
 
 @dataclass
-class EvaluationResult:
+class JudgeResult:
+    prompt: str
+    reference: str
+    candidate: str
+    score: int           # 1-5
+    reason: str
+    latency_ms: float
+
+
+@dataclass
+class JudgeSummary:
     experiment_id: str
     model_id: str
-    model_name: str
-    run_id: str
-
-    # Judge
-    accuracy: float          # win-rate (fraction scoring >= 4)
-    mean_score: float
-    score_distribution: dict
-
-    # Metrics
-    latency_p50_ms: float
-    latency_p95_ms: float
-    latency_p99_ms: float
-    cost_per_1k_tokens_usd: float
-    total_cost_usd: float
-
-    # Meta
     sample_count: int
-    evaluated_at: datetime
-
-    def passes_criteria(self, criteria: dict) -> tuple[bool, dict]:
-        """
-        Check whether this result passes promotion criteria.
-        Returns (passed, failures) where failures maps criterion → details.
-        """
-        failures = {}
-
-        if self.accuracy < criteria.get("min_accuracy", 0.85):
-            failures["accuracy"] = {
-                "required": criteria["min_accuracy"],
-                "actual": self.accuracy,
-            }
-        if self.latency_p95_ms > criteria.get("max_latency_p95_ms", 800):
-            failures["latency"] = {
-                "required": criteria["max_latency_p95_ms"],
-                "actual": self.latency_p95_ms,
-            }
-        if self.cost_per_1k_tokens_usd > criteria.get("max_cost_per_1k_tokens", 0.02):
-            failures["cost"] = {
-                "required": criteria["max_cost_per_1k_tokens"],
-                "actual": self.cost_per_1k_tokens_usd,
-            }
-        if self.sample_count < criteria.get("min_eval_sample_size", 100):
-            failures["sample_size"] = {
-                "required": criteria["min_eval_sample_size"],
-                "actual": self.sample_count,
-            }
-
-        return len(failures) == 0, failures
+    mean_score: float
+    win_rate: float          # fraction of samples scoring >= 4
+    score_distribution: dict[int, int] = field(default_factory=dict)
+    results: list[JudgeResult] = field(default_factory=list)
 
 
-class EvaluationSuite:
-    """
-    Runs the full evaluation pipeline for a single experiment or
-    a batch of experiments.
-    """
+class LLMJudge:
 
     def __init__(self):
-        self.judge = LLMJudge()
-        self.metrics = MetricsCollector()
+        self.client = Groq(api_key=settings.GROQ_API_KEY)
+        self.teacher_model = self._load_teacher_model()
+        self.judge_model = "llama-3.3-70b-versatile"   # same model judges
 
-    def evaluate_all(self, experiment_ids: list[str]) -> list[dict]:
-        """
-        Evaluate all experiments by ID. Loads each experiment from
-        MongoDB, runs inference + judge scoring, and returns a list
-        of result dicts for the promotion stage.
-        """
-        from pymongo import MongoClient
-        from orchestrator.core.config import settings
+    def _load_teacher_model(self) -> str:
+        import yaml
+        with open(settings.MODELS_CONFIG) as f:
+            cfg = yaml.safe_load(f)
+        return cfg["teacher"]["model"]
 
-        client = MongoClient(settings.MONGO_URI)
-        db = client[settings.MONGO_DB]
+    # ── Main entry point ──────────────────────────────────────────────────
 
-        results = []
-        for experiment_id in experiment_ids:
-            exp = db.experiments.find_one({"_id": experiment_id})
-            if not exp:
-                logger.warning("experiment_not_found", experiment_id=experiment_id)
-                continue
-
-            if exp.get("status") not in ("pending_eval",):
-                logger.warning("experiment_skipped",
-                               experiment_id=experiment_id,
-                               status=exp.get("status"))
-                continue
-
-            try:
-                # Load samples for this dataset
-                dataset = db.datasets.find_one({"_id": exp["dataset_id"]})
-                if not dataset or not dataset.get("samples"):
-                    logger.warning("dataset_not_found",
-                                   experiment_id=experiment_id,
-                                   dataset_id=exp.get("dataset_id"))
-                    continue
-
-                samples = dataset["samples"]
-                prompts = [s["prompt"] for s in samples]
-                reference_responses = [s["response"] for s in samples]
-
-                result = self.run(
-                    experiment_id=experiment_id,
-                    model_id=exp["model_id"],
-                    model_name=exp["model_name"],
-                    run_id=exp["run_id"],
-                    prompts=prompts,
-                    reference_responses=reference_responses,
-                )
-
-                # Update experiment status in MongoDB
-                db.experiments.update_one(
-                    {"_id": experiment_id},
-                    {"$set": {
-                        "status": "completed",
-                        "metrics": {
-                            "accuracy": result.accuracy,
-                            "mean_score": result.mean_score,
-                            "latency_p95_ms": result.latency_p95_ms,
-                            "cost_per_1k_tokens_usd": result.cost_per_1k_tokens_usd,
-                        },
-                        "updated_at": datetime.now(timezone.utc),
-                    }}
-                )
-
-                results.append({
-                    "experiment_id": experiment_id,
-                    "model_id": result.model_id,
-                    "model_name": result.model_name,
-                    "experiment_type": exp.get("experiment_type"),
-                    "accuracy": result.accuracy,
-                    "mean_score": result.mean_score,
-                    "latency_p95_ms": result.latency_p95_ms,
-                    "cost_per_1k_tokens": result.cost_per_1k_tokens_usd,
-                    "total_cost_usd": result.total_cost_usd,
-                    "sample_count": result.sample_count,
-                    "adapter_repo_id": exp.get("adapter_repo_id"),
-                })
-
-            except Exception as exc:
-                logger.error("experiment_evaluation_failed",
-                             experiment_id=experiment_id,
-                             error=str(exc))
-                db.experiments.update_one(
-                    {"_id": experiment_id},
-                    {"$set": {
-                        "status": "eval_failed",
-                        "error": str(exc),
-                        "updated_at": datetime.now(timezone.utc),
-                    }}
-                )
-
-        client.close()
-        logger.info("evaluate_all_complete",
-                    total=len(experiment_ids),
-                    scored=len(results))
-        return results
-
-    def run(
+    def evaluate(
         self,
         experiment_id: str,
         model_id: str,
         model_name: str,
-        run_id: str,
-        prompts: list[str],
-        reference_responses: list[str],
-        mlflow_experiment: Optional[str] = None,
-    ) -> EvaluationResult:
-        logger.info("evaluation_started",
+        eval_samples: list[dict],
+        adapter_repo_id: str | None = None,
+    ) -> JudgeSummary:
+        """
+        Score a candidate model against the teacher on eval_samples.
+        Returns a JudgeSummary with win_rate and full per-sample results.
+        """
+        logger.info("judge_eval_started",
                     experiment_id=experiment_id,
-                    model_name=model_name,
-                    sample_count=len(prompts))
+                    model_id=model_id,
+                    samples=len(eval_samples))
 
-        # ── 1. Latency + cost metrics ──────────────────────────────────
-        metrics_summary: MetricsSummary = self.metrics.measure(
-            model_name=model_name,
-            prompts=prompts,
+        results = []
+        for sample in eval_samples:
+            result = self._score_sample(
+                prompt=sample["prompt"],
+                candidate_model=model_name,
+            )
+            results.append(result)
+            time.sleep(0.1)   # rate limit buffer
+
+        summary = self._summarise(experiment_id, model_id, results)
+        logger.info("judge_eval_completed",
+                    experiment_id=experiment_id,
+                    win_rate=summary.win_rate,
+                    mean_score=summary.mean_score)
+        return summary
+
+    # ── Per-sample scoring ────────────────────────────────────────────────
+
+    def _score_sample(self, prompt: str, candidate_model: str) -> JudgeResult:
+        """Get teacher + candidate responses, then ask judge to score."""
+
+        # 1. Teacher response (ground truth)
+        reference = self._call_model(self.teacher_model, prompt)
+
+        # 2. Candidate response
+        t0 = time.time()
+        candidate = self._call_model(candidate_model, prompt)
+        latency_ms = (time.time() - t0) * 1000
+
+        # 3. Judge score
+        score, reason = self._judge(prompt, reference, candidate)
+
+        return JudgeResult(
+            prompt=prompt,
+            reference=reference,
+            candidate=candidate,
+            score=score,
+            reason=reason,
+            latency_ms=latency_ms,
         )
 
-        # ── 2. LLM judge scoring ───────────────────────────────────────
-        candidate_responses = metrics_summary.responses
-        judge_summary: JudgeSummary = self.judge.evaluate(
-            experiment_id=experiment_id,
-            model_name=model_name,
-            prompts=prompts,
-            reference_responses=reference_responses,
-            candidate_responses=candidate_responses,
+    def _call_model(self, model: str, prompt: str) -> str:
+        """Call a Groq-hosted model and return the text response."""
+        resp = self.client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=512,
+            temperature=0.0,
+        )
+        return resp.choices[0].message.content.strip()
+
+    def _judge(self, prompt: str, reference: str, candidate: str) -> tuple[int, str]:
+        """Ask the judge model to score candidate vs reference. Returns (score, reason)."""
+        import json
+
+        user_msg = _JUDGE_USER_TEMPLATE.format(
+            prompt=prompt,
+            reference=reference,
+            candidate=candidate,
         )
 
-        # ── 3. Assemble result ─────────────────────────────────────────
-        result = EvaluationResult(
+        for attempt in range(3):
+            try:
+                resp = self.client.chat.completions.create(
+                    model=self.judge_model,
+                    messages=[
+                        {"role": "system", "content": _JUDGE_SYSTEM_PROMPT},
+                        {"role": "user", "content": user_msg},
+                    ],
+                    max_tokens=128,
+                    temperature=0.0,
+                )
+                raw = resp.choices[0].message.content.strip()
+                parsed = json.loads(raw)
+                score = int(parsed["score"])
+                reason = parsed.get("reason", "")
+                return max(1, min(5, score)), reason   # clamp to 1-5
+
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                logger.warning("judge_parse_failed",
+                               attempt=attempt, error=str(e), raw=raw[:200])
+                time.sleep(1)
+
+        # Fallback if all attempts fail
+        logger.error("judge_failed_all_attempts", prompt=prompt[:100])
+        return 1, "parse_error"
+
+    # ── Summarisation ─────────────────────────────────────────────────────
+
+    def _summarise(
+        self,
+        experiment_id: str,
+        model_id: str,
+        results: list[JudgeResult],
+    ) -> JudgeSummary:
+        if not results:
+            return JudgeSummary(
+                experiment_id=experiment_id,
+                model_id=model_id,
+                sample_count=0,
+                mean_score=0.0,
+                win_rate=0.0,
+            )
+
+        scores = [r.score for r in results]
+        distribution = {i: scores.count(i) for i in range(1, 6)}
+        mean_score = sum(scores) / len(scores)
+        win_rate = sum(1 for s in scores if s >= 4) / len(scores)
+
+        return JudgeSummary(
             experiment_id=experiment_id,
             model_id=model_id,
-            model_name=model_name,
-            run_id=run_id,
-            accuracy=judge_summary.win_rate,
-            mean_score=judge_summary.mean_score,
-            score_distribution=judge_summary.score_distribution,
-            latency_p50_ms=metrics_summary.p50_ms,
-            latency_p95_ms=metrics_summary.p95_ms,
-            latency_p99_ms=metrics_summary.p99_ms,
-            cost_per_1k_tokens_usd=metrics_summary.cost_per_1k_tokens_usd,
-            total_cost_usd=metrics_summary.total_cost_usd,
-            sample_count=judge_summary.sample_count,
-            evaluated_at=datetime.now(timezone.utc),
+            sample_count=len(results),
+            mean_score=round(mean_score, 4),
+            win_rate=round(win_rate, 4),
+            score_distribution=distribution,
+            results=results,
         )
-
-        # ── 4. Log to MLflow ───────────────────────────────────────────
-        self._log_to_mlflow(result, mlflow_experiment or "data-flywheel")
-
-        logger.info("evaluation_complete",
-                    experiment_id=experiment_id,
-                    model_name=model_name,
-                    accuracy=result.accuracy,
-                    latency_p95_ms=result.latency_p95_ms,
-                    cost_per_1k=result.cost_per_1k_tokens_usd)
-
-        return result
-
-    def _log_to_mlflow(self, result: EvaluationResult, experiment_name: str) -> None:
-        try:
-            mlflow.set_experiment(experiment_name)
-            with mlflow.start_run(run_name=f"{result.model_name}_{result.experiment_id[:8]}"):
-                mlflow.set_tags({
-                    "experiment_id": result.experiment_id,
-                    "model_id": result.model_id,
-                    "model_name": result.model_name,
-                    "run_id": result.run_id,
-                    "evaluated_at": result.evaluated_at.isoformat(),
-                })
-                mlflow.log_metrics({
-                    "accuracy": result.accuracy,
-                    "mean_score": result.mean_score,
-                    "latency_p50_ms": result.latency_p50_ms,
-                    "latency_p95_ms": result.latency_p95_ms,
-                    "latency_p99_ms": result.latency_p99_ms,
-                    "cost_per_1k_tokens_usd": result.cost_per_1k_tokens_usd,
-                    "total_cost_usd": result.total_cost_usd,
-                    "sample_count": result.sample_count,
-                    **{f"score_{k}": v
-                       for k, v in result.score_distribution.items()},
-                })
-        except Exception as e:
-            logger.warning("mlflow_log_failed",
-                           experiment_id=result.experiment_id,
-                           error=str(e))
