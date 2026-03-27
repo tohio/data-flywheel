@@ -1,199 +1,28 @@
-services:
+# Model registry — teacher and student candidates
 
-  # ── Orchestrator API ──────────────────────────────────────────────────────
-  orchestrator:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.orchestrator
-    container_name: flywheel-orchestrator
-    ports:
-      - "8000:8000"
-    env_file: ../../.env
-    environment:
-      - ENV=development
-    volumes:
-      - ../../orchestrator:/app/orchestrator
-      - ../../configs:/app/configs
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - flywheel
+teacher:
+  provider: groq
+  model: llama-3.3-70b-versatile
+  role: judge_and_label        # Used for LLM-as-judge AND to label unlabeled logs
 
-  # ── Celery Worker ─────────────────────────────────────────────────────────
-  worker:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.worker
-    container_name: flywheel-worker
-    env_file: ../../.env
-    environment:
-      - ENV=development
-    volumes:
-      - ../../orchestrator:/app/orchestrator
-      - ../../configs:/app/configs
-      - hf_cache:/root/.cache/huggingface
-    depends_on:
-      redis:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - flywheel
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+candidates:
+  - id: qwen-0.5b
+    provider: groq
+    model: llama-3.2-1b-preview        # Groq model name (used for inference)
+    hf_model: Qwen/Qwen2.5-0.5B        # HF Hub model ID (used for TRL training)
+    experiments: [icl, lora_sft]
+    target: low_cost
 
-  # ── Celery Beat (scheduler) ───────────────────────────────────────────────
-  beat:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.worker
-    container_name: flywheel-beat
-    env_file: ../../.env
-    environment:
-      - ENV=development
-    volumes:
-      - ../../orchestrator:/app/orchestrator
-      - ../../configs:/app/configs
-      - celerybeat_data:/app/celerybeat
-    command: >
-      celery -A orchestrator.core.celery_app beat
-      --loglevel=info
-      --scheduler celery.beat.PersistentScheduler
-      --schedule /app/celerybeat/celerybeat-schedule
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - flywheel
+  - id: qwen-1.5b
+    provider: groq
+    model: llama-3.2-3b-preview
+    hf_model: Qwen/Qwen2.5-1.5B
+    experiments: [icl, lora_sft]
+    target: balanced
 
-  # ── MongoDB ───────────────────────────────────────────────────────────────
-  mongodb:
-    image: mongo:7.0
-    container_name: flywheel-mongodb
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - flywheel
-
-  # ── Redis ─────────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7.2-alpine
-    container_name: flywheel-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - flywheel
-
-  # ── Elasticsearch ─────────────────────────────────────────────────────────
-  elasticsearch:
-    image: elasticsearch:8.12.2
-    container_name: flywheel-elasticsearch
-    ports:
-      - "9200:9200"
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-    restart: unless-stopped
-    networks:
-      - flywheel
-
-  # ── PostgreSQL (MLflow backend store) ─────────────────────────────────────
-  postgres:
-    image: postgres:18-alpine
-    container_name: flywheel-postgres
-    environment:
-      POSTGRES_USER: mlflow
-      POSTGRES_PASSWORD: mlflow
-      POSTGRES_DB: mlflow
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    command: >
-      postgres
-      -c idle_in_transaction_session_timeout=300000
-      -c tcp_keepalives_idle=60
-      -c tcp_keepalives_interval=10
-      -c tcp_keepalives_count=6
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mlflow"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - flywheel
-
-  # ── MLflow ────────────────────────────────────────────────────────────────
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.22.0
-    container_name: flywheel-mlflow
-    ports:
-      - "5000:5000"
-    entrypoint: ["bash", "-c"]
-    command:
-      - |
-        pip install psycopg2-binary gevent --quiet &&
-        mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://mlflow:mlflow@postgres:5432/mlflow --default-artifact-root /mlflow/artifacts --gunicorn-opts "--timeout 300 --worker-class gevent --workers 2"
-    volumes:
-      - mlflow_artifacts:/mlflow/artifacts
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - flywheel
-
-# ── Volumes ───────────────────────────────────────────────────────────────
-volumes:
-  mongodb_data:
-  redis_data:
-  elasticsearch_data:
-  postgres_data:
-  mlflow_artifacts:
-  celerybeat_data:
-  hf_cache:
-
-# ── Networks ──────────────────────────────────────────────────────────────
-networks:
-  flywheel:
-    driver: bridge
+  - id: qwen-3b
+    provider: groq
+    model: llama-3.1-8b-instant
+    hf_model: Qwen/Qwen2.5-3B
+    experiments: [icl, lora_sft]
+    target: high_accuracy
