@@ -78,6 +78,11 @@ class LoRASFTService:
                                    model_id=model_id,
                                    reason="hf_model not set in models.yaml")
                     continue
+                # Skip if already completed for this run
+                if self._experiment_exists(run_id, model_id, "lora_sft"):
+                    logger.info("lora_skipped_already_completed",
+                                model_id=model_id, run_id=run_id)
+                    continue
                 exp_id = self._run_lora_experiment(
                     run_id, model_id, model_name, hf_model, dataset_id,
                     samples, flywheel_cfg.get("experiments", {})
@@ -328,6 +333,20 @@ class LoRASFTService:
         return output_dir
 
     # ── Helpers ───────────────────────────────────────────────────────────
+
+    def _experiment_exists(self, run_id: str, model_id: str, experiment_type: str) -> bool:
+        """Check if a completed or pending_eval experiment already exists for this run + model."""
+        from pymongo import MongoClient
+        client = MongoClient(settings.MONGO_URI)
+        db = client[settings.MONGO_DB]
+        exists = db.experiments.find_one({
+            "run_id": run_id,
+            "model_id": model_id,
+            "experiment_type": experiment_type,
+            "status": {"$in": ["pending_eval", "completed"]},
+        })
+        client.close()
+        return exists is not None
 
     def _update_experiment(self, experiment_id: str, update: dict) -> None:
         from pymongo import MongoClient

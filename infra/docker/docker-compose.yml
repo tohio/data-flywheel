@@ -37,6 +37,7 @@ services:
     volumes:
       - ../../orchestrator:/app/orchestrator
       - ../../configs:/app/configs
+      - hf_cache:/root/.cache/huggingface
     depends_on:
       redis:
         condition: service_healthy
@@ -190,6 +191,7 @@ volumes:
   postgres_data:
   mlflow_artifacts:
   celerybeat_data:
+  hf_cache:
 
 # ── Networks ──────────────────────────────────────────────────────────────
 networks:
