@@ -294,8 +294,9 @@ class LoRASFTService:
             logging_steps=5,
             save_steps=max_steps,
             save_total_limit=1,
-            remove_unused_columns=False,
-            report_to="none",   # disable HuggingFace Trainer's built-in MLflow/wandb reporting
+            remove_unused_columns=True,
+            max_seq_length=1024,
+            report_to="none",
         )
 
         # ── Train ─────────────────────────────────────────────────────────
@@ -304,6 +305,13 @@ class LoRASFTService:
             args=sft_config,
             train_dataset=dataset,
             tokenizer=tokenizer,
+            formatting_func=lambda x: [
+                tokenizer.apply_chat_template(
+                    x["messages"] if isinstance(x["messages"], list) else [x["messages"]],
+                    tokenize=False,
+                    add_generation_prompt=False,
+                )
+            ],
         )
         trainer.train()
 
