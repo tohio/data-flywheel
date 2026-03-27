@@ -73,16 +73,108 @@ class EvaluationResult:
 
 class EvaluationSuite:
     """
-    Runs the full evaluation pipeline for a single experiment:
-      1. Collect latency + cost metrics via MetricsCollector
-      2. Score responses via LLMJudge
-      3. Log everything to MLflow
-      4. Return a structured EvaluationResult
+    Runs the full evaluation pipeline for a single experiment or
+    a batch of experiments.
     """
 
     def __init__(self):
         self.judge = LLMJudge()
         self.metrics = MetricsCollector()
+
+    def evaluate_all(self, experiment_ids: list[str]) -> list[dict]:
+        """
+        Evaluate all experiments by ID. Loads each experiment from
+        MongoDB, runs inference + judge scoring, and returns a list
+        of result dicts for the promotion stage.
+        """
+        from pymongo import MongoClient
+        from orchestrator.core.config import settings
+
+        client = MongoClient(settings.MONGO_URI)
+        db = client[settings.MONGO_DB]
+
+        results = []
+        for experiment_id in experiment_ids:
+            exp = db.experiments.find_one({"_id": experiment_id})
+            if not exp:
+                logger.warning("experiment_not_found", experiment_id=experiment_id)
+                continue
+
+            if exp.get("status") not in ("pending_eval",):
+                logger.warning("experiment_skipped",
+                               experiment_id=experiment_id,
+                               status=exp.get("status"))
+                continue
+
+            try:
+                # Load samples for this dataset
+                dataset = db.curated_datasets.find_one({"_id": exp["dataset_id"]})
+                if not dataset or not dataset.get("samples"):
+                    logger.warning("dataset_not_found",
+                                   experiment_id=experiment_id,
+                                   dataset_id=exp.get("dataset_id"))
+                    continue
+
+                samples = dataset["samples"]
+                prompts = [s["prompt"] for s in samples]
+                reference_responses = [s["response"] for s in samples]
+
+                result = self.run(
+                    experiment_id=experiment_id,
+                    model_id=exp["model_id"],
+                    model_name=exp["model_name"],
+                    run_id=exp["run_id"],
+                    prompts=prompts,
+                    reference_responses=reference_responses,
+                )
+
+                # Update experiment status in MongoDB
+                db.experiments.update_one(
+                    {"_id": experiment_id},
+                    {"$set": {
+                        "status": "completed",
+                        "metrics": {
+                            "accuracy": result.accuracy,
+                            "mean_score": result.mean_score,
+                            "latency_p95_ms": result.latency_p95_ms,
+                            "cost_per_1k_tokens_usd": result.cost_per_1k_tokens_usd,
+                        },
+                        "updated_at": datetime.now(timezone.utc),
+                    }}
+                )
+
+                results.append({
+                    "experiment_id": experiment_id,
+                    "model_id": result.model_id,
+                    "model_name": result.model_name,
+                    "experiment_type": exp.get("experiment_type"),
+                    "accuracy": result.accuracy,
+                    "mean_score": result.mean_score,
+                    "latency_p95_ms": result.latency_p95_ms,
+                    "cost_per_1k_tokens": result.cost_per_1k_tokens_usd,
+                    "total_cost_usd": result.total_cost_usd,
+                    "sample_count": result.sample_count,
+                    "adapter_repo_id": exp.get("adapter_repo_id"),
+                })
+
+            except Exception as exc:
+                logger.error("experiment_evaluation_failed",
+                             experiment_id=experiment_id,
+                             error=str(exc))
+                db.experiments.update_one(
+                    {"_id": experiment_id},
+                    {"$set": {
+                        "status": "eval_failed",
+                        "error": str(exc),
+                        "updated_at": datetime.now(timezone.utc),
+                    }}
+                )
+
+        client.close()
+        logger.info("evaluate_all_complete",
+                    total=len(experiment_ids),
+                    scored=len(results))
+        return results
 
     def run(
         self,
