@@ -216,7 +216,7 @@ class LoRASFTService:
     ) -> str:
         """
         Fine-tune a model with LoRA SFT using TRL + PEFT.
-        hf_model is the HF Hub model ID (e.g. meta-llama/Llama-3.2-1B).
+        hf_model is the HF Hub model ID (e.g. Qwen/Qwen2.5-0.5B).
         Returns path to the saved adapter directory.
         """
         import torch
@@ -295,6 +295,7 @@ class LoRASFTService:
             save_steps=max_steps,
             save_total_limit=1,
             remove_unused_columns=False,
+            report_to="none",   # disable HuggingFace Trainer's built-in MLflow/wandb reporting
         )
 
         # ── Train ─────────────────────────────────────────────────────────
