@@ -1,7 +1,5 @@
 # Model registry — teacher and student candidates
 
-# Model registry — teacher and student candidates
-
 teacher:
   provider: groq
   model: llama-3.3-70b-versatile
