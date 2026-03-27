@@ -108,7 +108,7 @@ class EvaluationSuite:
 
             try:
                 # Load samples for this dataset
-                dataset = db.curated_datasets.find_one({"_id": exp["dataset_id"]})
+                dataset = db.datasets.find_one({"_id": exp["dataset_id"]})
                 if not dataset or not dataset.get("samples"):
                     logger.warning("dataset_not_found",
                                    experiment_id=experiment_id,
