@@ -1,25 +1,30 @@
 # Model registry — teacher and student candidates
 
+# Model registry — teacher and student candidates
+
 teacher:
   provider: groq
   model: llama-3.3-70b-versatile
   role: judge_and_label        # Used for LLM-as-judge AND to label unlabeled logs
 
 candidates:
-  - id: llama-1b
+  - id: qwen-0.5b
     provider: groq
-    model: llama-3.2-1b-preview
+    model: llama-3.2-1b-preview        # Groq model name (used for inference)
+    hf_model: Qwen/Qwen2.5-0.5B        # HF Hub model ID (used for TRL training)
     experiments: [icl, lora_sft]
-    target: low_cost           # Optimization target for this candidate
+    target: low_cost
 
-  - id: llama-3b
+  - id: qwen-1.5b
     provider: groq
     model: llama-3.2-3b-preview
+    hf_model: Qwen/Qwen2.5-1.5B
     experiments: [icl, lora_sft]
     target: balanced
 
-  - id: llama-8b
+  - id: qwen-3b
     provider: groq
     model: llama-3.1-8b-instant
+    hf_model: Qwen/Qwen2.5-3B
     experiments: [icl, lora_sft]
     target: high_accuracy

@@ -12,7 +12,7 @@ services:
     environment:
       - ENV=development
     volumes:
-      - ../../orchestrator:/app/orchestrator   # live reload in dev
+      - ../../orchestrator:/app/orchestrator
       - ../../configs:/app/configs
     depends_on:
       mongodb:
@@ -35,7 +35,7 @@ services:
     environment:
       - ENV=development
     volumes:
-      - ../../orchestrator:/app/orchestrator   # live reload in dev
+      - ../../orchestrator:/app/orchestrator
       - ../../configs:/app/configs
     depends_on:
       redis:
@@ -43,6 +43,38 @@ services:
       mongodb:
         condition: service_healthy
       elasticsearch:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - flywheel
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # ── Celery Beat (scheduler) ───────────────────────────────────────────────
+  beat:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.worker
+    container_name: flywheel-beat
+    env_file: ../../.env
+    environment:
+      - ENV=development
+    volumes:
+      - ../../orchestrator:/app/orchestrator
+      - ../../configs:/app/configs
+      - celerybeat_data:/app/celerybeat
+    command: >
+      celery -A orchestrator.core.celery_app beat
+      --loglevel=info
+      --scheduler celery.beat.PersistentScheduler
+      --schedule /app/celerybeat/celerybeat-schedule
+    depends_on:
+      redis:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -90,7 +122,7 @@ services:
       - "9200:9200"
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false       # dev only — no auth
+      - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
@@ -103,22 +135,53 @@ services:
     networks:
       - flywheel
 
+  # ── PostgreSQL (MLflow backend store) ─────────────────────────────────────
+  postgres:
+    image: postgres:18-alpine
+    container_name: flywheel-postgres
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: mlflow
+      POSTGRES_DB: mlflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c idle_in_transaction_session_timeout=300000
+      -c tcp_keepalives_idle=60
+      -c tcp_keepalives_interval=10
+      -c tcp_keepalives_count=6
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - flywheel
+
   # ── MLflow ────────────────────────────────────────────────────────────────
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.22.0
     container_name: flywheel-mlflow
     ports:
       - "5000:5000"
-    command: >
-      mlflow server
-      --host 0.0.0.0
-      --port 5000
-      --backend-store-uri mongodb://mongodb:27017/mlflow
-      --default-artifact-root /mlflow/artifacts
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        pip install psycopg2-binary gevent --quiet &&
+        mlflow server
+        --host 0.0.0.0
+        --port 5000
+        --backend-store-uri postgresql://mlflow:mlflow@postgres:5432/mlflow
+        --default-artifact-root /mlflow/artifacts
+        --gunicorn-opts "--timeout 300 --worker-class gevent --workers 2"
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
     depends_on:
-      mongodb:
+      postgres:
         condition: service_healthy
     restart: unless-stopped
     networks:
@@ -129,32 +192,11 @@ volumes:
   mongodb_data:
   redis_data:
   elasticsearch_data:
+  postgres_data:
   mlflow_artifacts:
+  celerybeat_data:
 
 # ── Networks ──────────────────────────────────────────────────────────────
 networks:
   flywheel:
     driver: bridge
-
-  # ── Celery Beat (scheduler) ─────────────────────────────────────────────
-  beat:
-    build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.worker
-    container_name: flywheel-beat
-    env_file: ../../.env
-    environment:
-      - ENV=development
-    volumes:
-      - ../../orchestrator:/app/orchestrator
-      - ../../configs:/app/configs
-    command: >
-      celery -A orchestrator.core.celery_app beat
-      --loglevel=info
-      --scheduler celery.beat.PersistentScheduler
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - flywheel

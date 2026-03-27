@@ -1,165 +1,174 @@
 """
-EvaluationSuite
----------------
-Orchestrates the full evaluation run for a single experiment:
-
-  1. Load experiment + eval samples from MongoDB
-  2. Collect latency + cost metrics (MetricsCollector)
-  3. Score with LLM judge (LLMJudge)
-  4. Write results back to MongoDB experiment record
-  5. Log everything to MLflow
-
-Returns a scored dict used by the promotion stage.
+benchmarks.py
+-------------
+Orchestrates a full evaluation run for a given experiment.
+Combines LLM judge scoring and latency/cost metrics, then logs
+everything to MLflow. No external eval framework required.
 """
-import dataclasses
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Optional
+import mlflow
 
-import yaml
-
-from orchestrator.core.config import settings
-from orchestrator.services.evaluator.judge import LLMJudge
-from orchestrator.services.evaluator.metrics import MetricsCollector
+from orchestrator.services.evaluator.judge import LLMJudge, JudgeSummary
+from orchestrator.services.evaluator.metrics import MetricsCollector, MetricsSummary
 from orchestrator.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-# How many samples to use for evaluation (random subset of curated dataset)
-_EVAL_SAMPLE_LIMIT = 100
+
+@dataclass
+class EvaluationResult:
+    experiment_id: str
+    model_id: str
+    model_name: str
+    run_id: str
+
+    # Judge
+    accuracy: float          # win-rate (fraction scoring >= 4)
+    mean_score: float
+    score_distribution: dict
+
+    # Metrics
+    latency_p50_ms: float
+    latency_p95_ms: float
+    latency_p99_ms: float
+    cost_per_1k_tokens_usd: float
+    total_cost_usd: float
+
+    # Meta
+    sample_count: int
+    evaluated_at: datetime
+
+    def passes_criteria(self, criteria: dict) -> tuple[bool, dict]:
+        """
+        Check whether this result passes promotion criteria.
+        Returns (passed, failures) where failures maps criterion → details.
+        """
+        failures = {}
+
+        if self.accuracy < criteria.get("min_accuracy", 0.85):
+            failures["accuracy"] = {
+                "required": criteria["min_accuracy"],
+                "actual": self.accuracy,
+            }
+        if self.latency_p95_ms > criteria.get("max_latency_p95_ms", 800):
+            failures["latency"] = {
+                "required": criteria["max_latency_p95_ms"],
+                "actual": self.latency_p95_ms,
+            }
+        if self.cost_per_1k_tokens_usd > criteria.get("max_cost_per_1k_tokens", 0.02):
+            failures["cost"] = {
+                "required": criteria["max_cost_per_1k_tokens"],
+                "actual": self.cost_per_1k_tokens_usd,
+            }
+        if self.sample_count < criteria.get("min_eval_sample_size", 100):
+            failures["sample_size"] = {
+                "required": criteria["min_eval_sample_size"],
+                "actual": self.sample_count,
+            }
+
+        return len(failures) == 0, failures
 
 
 class EvaluationSuite:
+    """
+    Runs the full evaluation pipeline for a single experiment:
+      1. Collect latency + cost metrics via MetricsCollector
+      2. Score responses via LLMJudge
+      3. Log everything to MLflow
+      4. Return a structured EvaluationResult
+    """
 
     def __init__(self):
         self.judge = LLMJudge()
         self.metrics = MetricsCollector()
 
-    def evaluate_experiment(self, experiment_id: str) -> dict:
-        """
-        Run full evaluation for one experiment.
-        Returns a scored dict with all metrics.
-        """
-        from pymongo import MongoClient
-        client = MongoClient(settings.MONGO_URI)
-        db = client[settings.MONGO_DB]
-
-        # Load experiment record
-        exp = db.experiments.find_one({"_id": experiment_id})
-        if not exp:
-            raise ValueError(f"Experiment {experiment_id} not found")
-
-        # Load eval samples from curated dataset
-        dataset = db.datasets.find_one({"_id": exp["dataset_id"]})
-        if not dataset:
-            raise ValueError(f"Dataset {exp['dataset_id']} not found")
-
-        samples = dataset["samples"][:_EVAL_SAMPLE_LIMIT]
-        prompts = [s["prompt"] for s in samples]
-
-        client.close()
-
-        model_name = exp["model_name"]
-        model_id = exp["model_id"]
-
+    def run(
+        self,
+        experiment_id: str,
+        model_id: str,
+        model_name: str,
+        run_id: str,
+        prompts: list[str],
+        reference_responses: list[str],
+        mlflow_experiment: Optional[str] = None,
+    ) -> EvaluationResult:
         logger.info("evaluation_started",
                     experiment_id=experiment_id,
-                    model_id=model_id,
-                    sample_count=len(samples))
+                    model_name=model_name,
+                    sample_count=len(prompts))
 
-        # ── 1. Latency + cost metrics ─────────────────────────────────────
-        model_metrics = self.metrics.measure(model_name, prompts)
+        # ── 1. Latency + cost metrics ──────────────────────────────────
+        metrics_summary: MetricsSummary = self.metrics.measure(
+            model_name=model_name,
+            prompts=prompts,
+        )
 
-        # ── 2. LLM judge accuracy ─────────────────────────────────────────
-        judge_summary = self.judge.evaluate(
+        # ── 2. LLM judge scoring ───────────────────────────────────────
+        candidate_responses = metrics_summary.responses
+        judge_summary: JudgeSummary = self.judge.evaluate(
+            experiment_id=experiment_id,
+            model_name=model_name,
+            prompts=prompts,
+            reference_responses=reference_responses,
+            candidate_responses=candidate_responses,
+        )
+
+        # ── 3. Assemble result ─────────────────────────────────────────
+        result = EvaluationResult(
             experiment_id=experiment_id,
             model_id=model_id,
             model_name=model_name,
-            eval_samples=samples,
-            adapter_repo_id=exp.get("adapter_repo_id"),
+            run_id=run_id,
+            accuracy=judge_summary.win_rate,
+            mean_score=judge_summary.mean_score,
+            score_distribution=judge_summary.score_distribution,
+            latency_p50_ms=metrics_summary.p50_ms,
+            latency_p95_ms=metrics_summary.p95_ms,
+            latency_p99_ms=metrics_summary.p99_ms,
+            cost_per_1k_tokens_usd=metrics_summary.cost_per_1k_tokens_usd,
+            total_cost_usd=metrics_summary.total_cost_usd,
+            sample_count=judge_summary.sample_count,
+            evaluated_at=datetime.now(timezone.utc),
         )
 
-        # ── 3. Compile result ─────────────────────────────────────────────
-        result = {
-            "experiment_id": experiment_id,
-            "model_id": model_id,
-            "model_name": model_name,
-            "experiment_type": exp["experiment_type"],
-            "accuracy": judge_summary.win_rate,
-            "mean_score": judge_summary.mean_score,
-            "score_distribution": judge_summary.score_distribution,
-            "latency_p95_ms": model_metrics.latency.p95_ms,
-            "latency_p50_ms": model_metrics.latency.p50_ms,
-            "cost_per_1k_tokens": model_metrics.cost.cost_per_1k_tokens_usd,
-            "total_cost_usd": model_metrics.cost.total_cost_usd,
-            "sample_count": len(samples),
-        }
+        # ── 4. Log to MLflow ───────────────────────────────────────────
+        self._log_to_mlflow(result, mlflow_experiment or "data-flywheel")
 
-        # ── 4. Persist to MongoDB ─────────────────────────────────────────
-        self._save_results(experiment_id, result)
-
-        # ── 5. Log to MLflow ──────────────────────────────────────────────
-        self._log_to_mlflow(exp, result)
-
-        logger.info("evaluation_completed",
+        logger.info("evaluation_complete",
                     experiment_id=experiment_id,
-                    accuracy=result["accuracy"],
-                    latency_p95_ms=result["latency_p95_ms"],
-                    cost_per_1k=result["cost_per_1k_tokens"])
+                    model_name=model_name,
+                    accuracy=result.accuracy,
+                    latency_p95_ms=result.latency_p95_ms,
+                    cost_per_1k=result.cost_per_1k_tokens_usd)
 
         return result
 
-    def evaluate_all(self, experiment_ids: list[str]) -> list[dict]:
-        """Evaluate all experiments and return scored list."""
-        results = []
-        for exp_id in experiment_ids:
-            try:
-                result = self.evaluate_experiment(exp_id)
-                results.append(result)
-            except Exception as e:
-                logger.error("experiment_eval_failed",
-                             experiment_id=exp_id, error=str(e))
-        return results
-
-    # ── Private helpers ───────────────────────────────────────────────────
-
-    def _save_results(self, experiment_id: str, result: dict) -> None:
-        from pymongo import MongoClient
-        client = MongoClient(settings.MONGO_URI)
-        db = client[settings.MONGO_DB]
-        db.experiments.update_one(
-            {"_id": experiment_id},
-            {"$set": {
-                "status": "completed",
-                "metrics": result,
-                "evaluated_at": datetime.now(timezone.utc),
-            }}
-        )
-        client.close()
-
-    def _log_to_mlflow(self, exp: dict, result: dict) -> None:
+    def _log_to_mlflow(self, result: EvaluationResult, experiment_name: str) -> None:
         try:
-            import mlflow
-            mlflow.set_tracking_uri(settings.MLFLOW_TRACKING_URI)
-            mlflow.set_experiment(settings.MLFLOW_EXPERIMENT_NAME)
-
-            with mlflow.start_run(run_name=f"{exp['model_id']}-{exp['experiment_type']}"):
-                mlflow.log_params({
-                    "model_id": exp["model_id"],
-                    "model_name": exp["model_name"],
-                    "experiment_type": exp["experiment_type"],
-                    "dataset_id": exp["dataset_id"],
-                    "adapter_repo_id": exp.get("adapter_repo_id", "none"),
+            mlflow.set_experiment(experiment_name)
+            with mlflow.start_run(run_name=f"{result.model_name}_{result.experiment_id[:8]}"):
+                mlflow.set_tags({
+                    "experiment_id": result.experiment_id,
+                    "model_id": result.model_id,
+                    "model_name": result.model_name,
+                    "run_id": result.run_id,
+                    "evaluated_at": result.evaluated_at.isoformat(),
                 })
                 mlflow.log_metrics({
-                    "accuracy": result["accuracy"],
-                    "mean_score": result["mean_score"],
-                    "latency_p95_ms": result["latency_p95_ms"],
-                    "latency_p50_ms": result["latency_p50_ms"],
-                    "cost_per_1k_tokens": result["cost_per_1k_tokens"],
-                    "total_cost_usd": result["total_cost_usd"],
-                    "sample_count": result["sample_count"],
+                    "accuracy": result.accuracy,
+                    "mean_score": result.mean_score,
+                    "latency_p50_ms": result.latency_p50_ms,
+                    "latency_p95_ms": result.latency_p95_ms,
+                    "latency_p99_ms": result.latency_p99_ms,
+                    "cost_per_1k_tokens_usd": result.cost_per_1k_tokens_usd,
+                    "total_cost_usd": result.total_cost_usd,
+                    "sample_count": result.sample_count,
+                    **{f"score_{k}": v
+                       for k, v in result.score_distribution.items()},
                 })
-                mlflow.set_tag("run_id", exp["run_id"])
-                mlflow.set_tag("experiment_id", exp["_id"])
         except Exception as e:
-            logger.warning("mlflow_logging_failed", error=str(e))
+            logger.warning("mlflow_log_failed",
+                           experiment_id=result.experiment_id,
+                           error=str(e))

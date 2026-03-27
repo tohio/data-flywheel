@@ -1,5 +1,4 @@
 FROM python:3.12-slim
-
 WORKDIR /app
 
 # System deps
@@ -11,8 +10,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Download spaCy model required by Presidio for PII detection
+RUN python -m spacy download en_core_web_lg
+
 # Copy application code
 COPY orchestrator/ ./orchestrator/
 COPY configs/ ./configs/
+
+# Create non-root user and writable directories
+RUN adduser --disabled-password --gecos '' celeryuser && \
+    mkdir -p /app/celerybeat && \
+    chown -R celeryuser:celeryuser /app/celerybeat
+
+USER celeryuser
 
 CMD ["celery", "-A", "orchestrator.core.celery_app", "worker", "--loglevel=info", "--concurrency=4"]

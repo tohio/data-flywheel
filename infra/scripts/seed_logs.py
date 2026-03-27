@@ -22,7 +22,7 @@ import os
 
 load_dotenv()
 
-ES_HOST = os.getenv("ES_HOST", "http://localhost:9200")
+ES_HOST = "http://localhost:9200"    #os.getenv("ES_HOST", "http://localhost:9200")
 ES_INDEX = os.getenv("ES_INDEX_LOGS", "inference_logs")
 
 # ── Sample data pools ─────────────────────────────────────────────────────

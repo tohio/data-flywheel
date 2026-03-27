@@ -4,7 +4,7 @@ A self-improving AI pipeline that continuously refines language models using rea
 
 Where a standard fine-tuning workflow requires manually curated datasets and scheduled retraining jobs, this system closes the loop — production traffic becomes training data, smaller models are continuously evaluated against a teacher, and the best candidate replaces the current production model without human intervention.
 
-Inspired by the [NVIDIA Data Flywheel Blueprint](https://build.nvidia.com/nvidia/build-an-enterprise-data-flywheel), built entirely on open-source tooling with no local GPU required.
+Inspired by the [NVIDIA Data Flywheel Blueprint](https://build.nvidia.com/nvidia/build-an-enterprise-data-flywheel), built entirely on open-source tooling.
 
 ![Architecture](docs/architecture.svg)
 
@@ -16,7 +16,7 @@ A data flywheel is a continuous improvement loop where each cycle makes the next
 
 1. **Ingest** — production inference logs accumulate in Elasticsearch
 2. **Curate** — filter, deduplicate, and quality-score the logs into a clean dataset
-3. **Experiment** — run ICL (zero compute) and LoRA SFT (HuggingFace AutoTrain) on candidate models
+3. **Experiment** — run ICL (zero compute) and LoRA SFT (TRL + PEFT) on candidate models
 4. **Evaluate** — LLM judge scores candidates against the teacher; latency and cost are measured
 5. **Promote** — candidates that pass all criteria replace the production model; others are logged and skipped
 
@@ -30,13 +30,25 @@ The result: models that get cheaper and faster over time without sacrificing acc
 |---|---|
 | Teacher model / LLM judge | Groq — Llama 3.3 70B |
 | Candidate models | Groq — Llama 3.2 1B, 3B · Llama 3.1 8B |
-| Fine-tuning | HuggingFace AutoTrain (LoRA SFT) |
+| Fine-tuning | TRL + PEFT (LoRA SFT) |
 | Orchestrator | FastAPI + Celery |
 | Log store | Elasticsearch |
 | State + model registry | MongoDB |
-| Experiment tracking | MLflow |
+| Experiment tracking | MLflow + PostgreSQL |
 | Task queue | Redis |
 | Local dev | Docker Compose |
+
+---
+
+## Hardware Requirements
+
+| Mode | Requirement | Notes |
+|---|---|---|
+| Local dev (no GPU) | Docker + 8GB RAM | ICL only — LoRA SFT runs 10 steps as a smoke test |
+| Full LoRA SFT | NVIDIA GPU (4GB+ VRAM) | Runs all 500 training steps with 4-bit quantization |
+| Recommended | Google Colab T4 or better | Free tier sufficient for Qwen 2.5 0.5B–3B |
+
+LoRA SFT training detects the available hardware automatically — on CPU it runs 10 steps to validate the pipeline, on GPU it runs the full training job.
 
 ---
 
@@ -67,7 +79,7 @@ data-flywheel/
 │   └── eval_criteria.yaml           promotion criteria
 ├── infra/
 │   ├── docker/                      Dockerfile · docker-compose (dev)
-│   └── scripts/                     setup · seed · reset
+│   └── scripts/                     setup · seed · reset · gpu_setup
 ├── notebooks/
 │   ├── exploration.ipynb            inspect raw logs, filter drop rates, quality scores
 │   ├── evaluation_analysis.ipynb    judge scores, latency/cost tradeoffs per model
@@ -87,15 +99,17 @@ data-flywheel/
 | Service | Purpose | Free Tier |
 |---|---|---|
 | Groq | Teacher model (Llama 3.3 70B) + LLM judge + candidate inference | Yes |
-| HuggingFace | LoRA SFT via AutoTrain — dataset upload + job submission | Yes |
+| HuggingFace | LoRA SFT — dataset upload + adapter push | Yes |
 
 Get them here:
-- **Groq** → https://console.groq.com
-- **HuggingFace** → https://huggingface.co/settings/tokens
+- **Groq** → https://console.groq.com  *(note: Hotmail/Outlook accounts are not accepted — use Gmail or another provider)*
+- **HuggingFace** → https://huggingface.co/settings/tokens — create a token with **Write** permissions
 
 ---
 
 ## Getting Started
+
+### Local (no GPU — ICL only)
 
 **Prerequisites**
 - Docker + Docker Compose
@@ -137,6 +151,7 @@ cp .env.sample .env
 # Edit .env:
 GROQ_API_KEY=...
 HF_TOKEN=...
+HF_USERNAME=...
 ```
 
 **Start services**
@@ -152,7 +167,44 @@ make seed          # seed Elasticsearch with synthetic inference logs
 make run-flywheel  # POST /flywheel/run — triggers a full cycle
 ```
 
-**Monitor**
+---
+
+### Cloud GPU (Google Colab, Lambda Labs, Vast.ai, RunPod)
+
+Any Ubuntu cloud GPU instance works. The setup script installs Docker and the NVIDIA Container Toolkit automatically.
+
+| Provider | Free Tier | Notes |
+|---|---|---|
+| Google Colab | Yes (T4) | Sessions expire — re-run setup each time |
+| Lambda Labs | No | Persistent storage, A10, A100 available |
+| Vast.ai | No | Cheapest hourly GPU rates |
+| RunPod | No | Good A40/A100 availability |
+
+```bash
+# In a Colab terminal (Runtime → Connect to a hosted runtime → T4 GPU)
+git clone https://github.com/tohio/data-flywheel
+cd data-flywheel
+bash infra/scripts/gpu_setup.sh
+```
+
+`gpu_setup.sh` verifies the GPU, installs Docker and the NVIDIA Container Toolkit, creates `.env`, starts all services, and waits for the API to be healthy.
+
+```bash
+make seed          # seed Elasticsearch with synthetic inference logs
+make run-flywheel  # triggers a full cycle including GPU LoRA SFT
+```
+
+> **Note:** Colab sessions expire. Re-run `gpu_setup.sh` on each new session. Data persists in Docker volumes for the duration of the session.
+
+---
+
+### Any NVIDIA GPU
+
+The compose file requests `count: 1, driver: nvidia` — it uses whatever GPU is available on the host. Works on T4, A10G, A100, V100, or any NVIDIA GPU without any config changes.
+
+---
+
+## Monitor
 
 ```bash
 open http://localhost:8000/docs   # API explorer
@@ -160,14 +212,14 @@ open http://localhost:5000        # MLflow experiments
 make logs                         # tail orchestrator + worker logs
 ```
 
-**Test**
+## Test
 
 ```bash
 make test      # unit tests (no services needed)
 make test-all  # unit + integration (requires make up)
 ```
 
-**Reset**
+## Reset
 
 ```bash
 bash infra/scripts/reset.sh   # wipe all local state and volumes
@@ -181,7 +233,7 @@ bash infra/scripts/reset.sh   # wipe all local state and volumes
 
 **No labeled data required** — the teacher model (Llama 3.3 70B) labels production logs on the fly. The LLM judge scores candidates against teacher responses. The flywheel runs from day one with zero human annotation.
 
-**Two experiment types** — ICL (in-context learning) evaluates the base candidate model with few-shot examples — no training, instant results. LoRA SFT runs parameter-efficient fine-tuning via HuggingFace AutoTrain on A10G GPUs without requiring local GPU hardware.
+**Two experiment types** — ICL (in-context learning) evaluates the base candidate model with few-shot examples — no training, instant results. LoRA SFT runs parameter-efficient fine-tuning with TRL + PEFT directly in the worker. On CPU it runs 10 steps to validate the pipeline; on GPU it runs the full training job with 4-bit quantization.
 
 **Atomic promotion** — the model registry enforces exactly one production model at all times. Promoting a candidate archives the previous model in a single MongoDB operation before setting the new one, so there is never a window with zero production models.
 
@@ -214,10 +266,12 @@ teacher:
   model: llama-3.3-70b-versatile
 
 candidates:
-  - id: llama-3b
+  - id: qwen-0.5b
     provider: groq
-    model: llama-3.2-3b-preview
+    model: llama-3.2-1b-preview        # Groq model name (used for inference)
+    hf_model: Qwen/Qwen2.5-0.5B        # HF Hub model ID (used for TRL training)
     experiments: [icl, lora_sft]
+    target: low_cost
 ```
 
 ### `configs/eval_criteria.yaml` — set promotion thresholds
@@ -244,6 +298,7 @@ schedule:
 
 This project is scoped to run as a standalone service. In a production deployment:
 
+- **GPU** — the worker container requests one NVIDIA GPU via the compose file. Any NVIDIA GPU works — T4, A10G, A100, V100. The training code adapts automatically.
 - **Security** — Elasticsearch runs with `xpack.security.enabled=false` for local dev. In production, TLS and authentication should be enabled.
 - **Scheduling** — the flywheel is triggered manually via `POST /flywheel/run`. In production, Celery Beat reads the cron from `flywheel.yaml` and fires the loop automatically.
 - **Persistence** — MongoDB and Elasticsearch use Docker named volumes locally. In production these should be backed by durable block storage.

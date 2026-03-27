@@ -50,6 +50,7 @@ celery_app.conf.update(
     task_acks_late=True,
     worker_prefetch_multiplier=1,
     result_expires=86400,
+    broker_connection_retry_on_startup=True,
 )
 
 # ── Beat schedule ─────────────────────────────────────────────────────────
