@@ -273,12 +273,24 @@ class LoRASFTService:
         model = get_peft_model(model, lora_config)
         model.print_trainable_parameters()
 
-        # ── Load dataset ──────────────────────────────────────────────────
-        dataset = load_dataset(
+        # ── Load and preprocess dataset ───────────────────────────────────
+        raw_dataset = load_dataset(
             dataset_repo_id,
             token=settings.HF_TOKEN,
             split="train",
         )
+
+        # Convert messages list to formatted text strings
+        def format_sample(example):
+            return {
+                "text": tokenizer.apply_chat_template(
+                    example["messages"],
+                    tokenize=False,
+                    add_generation_prompt=False,
+                )
+            }
+
+        dataset = raw_dataset.map(format_sample, remove_columns=raw_dataset.column_names)
 
         # ── Training config ───────────────────────────────────────────────
         # Fewer steps on CPU to keep dev runs fast
@@ -294,8 +306,8 @@ class LoRASFTService:
             logging_steps=5,
             save_steps=max_steps,
             save_total_limit=1,
-            remove_unused_columns=True,
             max_seq_length=1024,
+            dataset_text_field="text",
             report_to="none",
         )
 
@@ -305,13 +317,6 @@ class LoRASFTService:
             args=sft_config,
             train_dataset=dataset,
             tokenizer=tokenizer,
-            formatting_func=lambda x: [
-                tokenizer.apply_chat_template(
-                    x["messages"] if isinstance(x["messages"], list) else [x["messages"]],
-                    tokenize=False,
-                    add_generation_prompt=False,
-                )
-            ],
         )
         trainer.train()
 
