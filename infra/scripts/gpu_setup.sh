@@ -55,7 +55,7 @@ if dpkg -l | grep -q nvidia-container-toolkit 2>/dev/null; then
     echo -e "${GREEN}✓ NVIDIA Container Toolkit already installed${NC}"
 else
     curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
-        | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+        | sudo gpg --yes --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
 
     curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
         | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
@@ -66,8 +66,17 @@ else
     sudo nvidia-ctk runtime configure --runtime=docker
     # Restart Docker — works on both systemd and non-systemd
     sudo systemctl restart docker 2>/dev/null || sudo service docker restart 2>/dev/null || true
+    sleep 3
     echo -e "${GREEN}✓ NVIDIA Container Toolkit installed${NC}"
 fi
+
+# ── Ensure Docker daemon is running ──────────────────────────────────────
+echo -e "\n${YELLOW}Ensuring Docker daemon is running...${NC}"
+if ! sudo docker info &>/dev/null; then
+    sudo service docker start 2>/dev/null || sudo dockerd &>/tmp/dockerd.log &
+    sleep 5
+fi
+sudo docker info &>/dev/null && echo -e "${GREEN}✓ Docker daemon running${NC}"     || { echo -e "${RED}Docker daemon failed to start${NC}"; exit 1; }
 
 # ── Verify Docker can see GPU ─────────────────────────────────────────────
 echo -e "\n${YELLOW}Verifying Docker GPU access...${NC}"
@@ -90,7 +99,7 @@ else
 fi
 
 # Check required keys are set
-source "$PROJECT_ROOT/.env"
+set -a; source "$PROJECT_ROOT/.env" > /dev/null 2>&1; set +a
 MISSING=()
 [[ -z "${GROQ_API_KEY:-}" || "$GROQ_API_KEY" == "your_groq_api_key_here" ]] && MISSING+=("GROQ_API_KEY")
 [[ -z "${HF_TOKEN:-}" || "$HF_TOKEN" == "your_huggingface_token_here" ]] && MISSING+=("HF_TOKEN")
