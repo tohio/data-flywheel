@@ -8,14 +8,14 @@ teacher:
 candidates:
   - id: qwen-0.5b
     provider: groq
-    model: llama-3.2-1b-preview        # Groq model name (used for inference)
+    model: llama-3.1-8b-instant        # Groq model name (used for inference)
     hf_model: Qwen/Qwen2.5-0.5B        # HF Hub model ID (used for TRL training)
     experiments: [icl, lora_sft]
     target: low_cost
 
   - id: qwen-1.5b
     provider: groq
-    model: llama-3.2-3b-preview
+    model: llama-3.1-8b-instant
     hf_model: Qwen/Qwen2.5-1.5B
     experiments: [icl, lora_sft]
     target: balanced
