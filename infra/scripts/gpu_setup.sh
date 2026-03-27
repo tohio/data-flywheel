@@ -2,7 +2,7 @@
 # gpu_setup.sh
 # ------------
 # Sets up the full data-flywheel stack on any Ubuntu instance with an NVIDIA GPU.
-# Works on Google Colab, Lambda Labs, Vast.ai, RunPod, or any cloud GPU VM.
+# Tested on Lambda Labs, Vast.ai, and RunPod.
 #
 # Usage:
 #   bash infra/scripts/gpu_setup.sh
@@ -27,10 +27,9 @@ cd "$PROJECT_ROOT"
 echo -e "${YELLOW}Checking GPU...${NC}"
 if ! nvidia-smi &>/dev/null; then
     echo -e "${RED}No GPU detected. Make sure you are on a GPU instance:${NC}"
-    echo "  Colab      → Runtime → Change runtime type → T4 GPU"
-    echo "  Lambda     → select a GPU instance type"
-    echo "  Vast.ai    → filter by GPU when renting"
-    echo "  RunPod     → select a GPU pod"
+    echo "  Lambda Labs → select a GPU instance type"
+    echo "  Vast.ai     → filter by GPU when renting"
+    echo "  RunPod      → select a GPU pod"
     exit 1
 fi
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
@@ -42,10 +41,8 @@ if command -v docker &>/dev/null; then
     echo -e "${GREEN}✓ Docker already installed${NC}"
 else
     curl -fsSL https://get.docker.com | sh
-    # Add current user to docker group if possible
-    sudo usermod -aG docker "$(whoami)" 2>/dev/null || true
-    # Start Docker — works on both systemd and non-systemd (Colab)
-    sudo systemctl start docker 2>/dev/null || sudo service docker start 2>/dev/null || true
+    sudo usermod -aG docker "$(whoami)"
+    sudo systemctl enable --now docker
     echo -e "${GREEN}✓ Docker installed${NC}"
 fi
 
@@ -64,23 +61,13 @@ else
     sudo apt-get update -qq
     sudo apt-get install -y nvidia-container-toolkit
     sudo nvidia-ctk runtime configure --runtime=docker
-    # Restart Docker — works on both systemd and non-systemd
-    sudo systemctl restart docker 2>/dev/null || sudo service docker restart 2>/dev/null || true
-    sleep 3
+    sudo systemctl restart docker
     echo -e "${GREEN}✓ NVIDIA Container Toolkit installed${NC}"
 fi
 
-# ── Ensure Docker daemon is running ──────────────────────────────────────
-echo -e "\n${YELLOW}Ensuring Docker daemon is running...${NC}"
-if ! sudo docker info &>/dev/null; then
-    sudo service docker start 2>/dev/null || sudo dockerd &>/tmp/dockerd.log &
-    sleep 5
-fi
-sudo docker info &>/dev/null && echo -e "${GREEN}✓ Docker daemon running${NC}"     || { echo -e "${RED}Docker daemon failed to start${NC}"; exit 1; }
-
 # ── Verify Docker can see GPU ─────────────────────────────────────────────
 echo -e "\n${YELLOW}Verifying Docker GPU access...${NC}"
-sudo docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi \
+sudo docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi \
     && echo -e "${GREEN}✓ Docker can access GPU${NC}" \
     || { echo -e "${RED}Docker cannot access GPU — check toolkit install${NC}"; exit 1; }
 
@@ -156,6 +143,3 @@ echo "Next steps:"
 echo "  make seed          # seed inference logs"
 echo "  make run-flywheel  # trigger a flywheel cycle (GPU LoRA SFT enabled)"
 echo "  make logs          # tail worker logs"
-echo ""
-echo "Note: Colab sessions expire — re-run this script on each new session."
-echo "      Lambda / Vast.ai / RunPod instances persist until terminated."
