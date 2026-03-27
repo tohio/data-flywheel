@@ -11,7 +11,7 @@ the promotion decision:
 """
 import time
 import statistics
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from groq import Groq
 
@@ -54,6 +54,31 @@ class ModelMetrics:
     cost: CostMetrics
 
 
+@dataclass
+class MetricsSummary:
+    """
+    Flat summary returned by MetricsCollector.measure() —
+    used by EvaluationSuite in benchmarks.py.
+    Combines latency, cost and the raw candidate responses
+    so the LLM judge can score them.
+    """
+    model_name: str
+    sample_count: int
+    responses: list[str]
+
+    # Latency
+    p50_ms: float
+    p95_ms: float
+    p99_ms: float
+    mean_ms: float
+
+    # Cost
+    total_input_tokens: int
+    total_output_tokens: int
+    cost_per_1k_tokens_usd: float
+    total_cost_usd: float
+
+
 class MetricsCollector:
 
     def __init__(self):
@@ -63,14 +88,15 @@ class MetricsCollector:
         self,
         model_name: str,
         prompts: list[str],
-    ) -> ModelMetrics:
+    ) -> MetricsSummary:
         """
         Run inference on all prompts and collect latency + token metrics.
-        Returns a ModelMetrics dataclass.
+        Returns a MetricsSummary with responses and metrics combined.
         """
         latencies_ms = []
         total_input_tokens = 0
         total_output_tokens = 0
+        responses = []
 
         for prompt in prompts:
             t0 = time.time()
@@ -86,25 +112,33 @@ class MetricsCollector:
             usage = resp.usage
             total_input_tokens += usage.prompt_tokens
             total_output_tokens += usage.completion_tokens
+            responses.append(resp.choices[0].message.content or "")
 
             time.sleep(0.05)  # small rate limit buffer
 
-        latency_metrics = self._compute_latency(latencies_ms)
-        cost_metrics = self._compute_cost(
+        latency = self._compute_latency(latencies_ms)
+        cost = self._compute_cost(
             model_name, total_input_tokens, total_output_tokens, len(prompts)
         )
 
         logger.info("metrics_collected",
                     model=model_name,
                     samples=len(prompts),
-                    p95_ms=latency_metrics.p95_ms,
-                    cost_per_1k=cost_metrics.cost_per_1k_tokens_usd)
+                    p95_ms=latency.p95_ms,
+                    cost_per_1k=cost.cost_per_1k_tokens_usd)
 
-        return ModelMetrics(
+        return MetricsSummary(
             model_name=model_name,
             sample_count=len(prompts),
-            latency=latency_metrics,
-            cost=cost_metrics,
+            responses=responses,
+            p50_ms=latency.p50_ms,
+            p95_ms=latency.p95_ms,
+            p99_ms=latency.p99_ms,
+            mean_ms=latency.mean_ms,
+            total_input_tokens=total_input_tokens,
+            total_output_tokens=total_output_tokens,
+            cost_per_1k_tokens_usd=cost.cost_per_1k_tokens_usd,
+            total_cost_usd=cost.total_cost_usd,
         )
 
     # ── Private helpers ───────────────────────────────────────────────────
