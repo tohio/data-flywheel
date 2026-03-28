@@ -5,7 +5,7 @@ Orchestrates the full curation flow:
   1. Pull raw inference logs from Elasticsearch
   2. Filter (quality, PII, toxicity, length)
   3. Near-deduplicate (MinHash)
-  4. Score and rank remaining samples
+  4. Cap to max_samples if configured
   5. Save curated dataset to MongoDB + return dataset_id
 """
 from datetime import datetime, timezone
@@ -35,6 +35,7 @@ class CurationPipeline:
         self.dedup_threshold = cfg["dedup_threshold"]
         self.remove_pii = cfg["remove_pii"]
         self.min_response_length = cfg["min_response_length"]
+        self.max_samples = cfg.get("max_samples")  # optional cap
 
         self.filter_pipeline = FilterPipeline(
             min_quality_score=self.min_quality_score,
@@ -80,7 +81,13 @@ class CurationPipeline:
         logger.info("dedup_done", run_id=run_id,
                     before=len(filtered), after=len(deduped))
 
-        # ── 4. Save dataset ───────────────────────────────────────────────
+        # ── 4. Cap samples ────────────────────────────────────────────────
+        if self.max_samples and len(deduped) > self.max_samples:
+            deduped = deduped[:self.max_samples]
+            logger.info("samples_capped", run_id=run_id,
+                        max_samples=self.max_samples, after=len(deduped))
+
+        # ── 5. Save dataset ───────────────────────────────────────────────
         dataset_id = self._save_dataset(db, run_id, deduped)
         logger.info("dataset_saved", run_id=run_id, dataset_id=dataset_id)
 

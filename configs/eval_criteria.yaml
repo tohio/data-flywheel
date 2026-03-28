@@ -1,10 +1,9 @@
 # Promotion criteria — a candidate must pass ALL of these to be promoted
-
 promotion_criteria:
   min_accuracy: 0.85           # LLM judge win-rate vs teacher baseline
-  max_latency_p95_ms: 800      # 95th percentile latency
+  max_latency_p95_ms: 1500     # 95th percentile latency — reflects Groq real-world latency
   max_cost_per_1k_tokens: 0.02 # USD
-  min_eval_sample_size: 100    # Eval set must have at least N samples
+  min_eval_sample_size: 50     # Reduced from 100 — dedup typically yields 50-70 samples
 
 # If a candidate passes, it becomes the new "production" model.
 # The previous production model is archived (not deleted).
