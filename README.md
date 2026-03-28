@@ -260,6 +260,10 @@ bash infra/scripts/reset.sh   # wipe all local state and volumes
 
 ![Promotion](docs/screenshots/promotion.png)
 
+### Unit Tests — 46/46 passing
+
+![Tests](docs/screenshots/tests.png)
+
 ---
 
 ## Key Design Decisions
