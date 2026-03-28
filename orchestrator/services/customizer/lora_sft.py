@@ -287,13 +287,26 @@ class LoRASFTService:
 
         # Convert messages list to formatted text strings
         def format_sample(example):
-            return {
-                "text": tokenizer.apply_chat_template(
-                    example["messages"],
+            messages = example["messages"]
+            # Fallback for tokenizers without a chat template
+            if tokenizer.chat_template:
+                text = tokenizer.apply_chat_template(
+                    messages,
                     tokenize=False,
                     add_generation_prompt=False,
                 )
-            }
+            else:
+                # Simple prompt/response format
+                parts = []
+                for msg in messages:
+                    role = msg.get("role", "")
+                    content = msg.get("content", "")
+                    if role == "user":
+                        parts.append(f"### User:\n{content}")
+                    elif role == "assistant":
+                        parts.append(f"### Assistant:\n{content}")
+                text = "\n\n".join(parts) + tokenizer.eos_token
+            return {"text": text}
 
         dataset = raw_dataset.map(format_sample, remove_columns=raw_dataset.column_names)
 

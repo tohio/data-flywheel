@@ -24,8 +24,8 @@ logger = get_logger(__name__)
 _GROQ_PRICING: dict[str, dict[str, float]] = {
     "llama-3.3-70b-versatile":  {"input": 0.59, "output": 0.79},
     "llama-3.1-8b-instant":     {"input": 0.05, "output": 0.08},
-    "llama-3.2-3b-preview":     {"input": 0.06, "output": 0.06},
-    "llama-3.2-1b-preview":     {"input": 0.04, "output": 0.04},
+    "openai/gpt-oss-120b":      {"input": 0.15, "output": 0.60},
+    "openai/gpt-oss-20b":       {"input": 0.075, "output": 0.30},
 }
 _DEFAULT_PRICING = {"input": 0.10, "output": 0.10}
 
