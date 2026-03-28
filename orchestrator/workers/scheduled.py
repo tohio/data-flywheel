@@ -2,7 +2,6 @@
 scheduled.py
 ------------
 Celery Beat entry point for the automated flywheel cycle.
-
 Beat fires `scheduled_run` on the cron defined in flywheel.yaml.
 Before kicking off a full cycle the task checks whether enough
 new logs have accumulated since the last run (min_new_logs).
@@ -13,6 +12,7 @@ from datetime import datetime, timezone
 
 import yaml
 from elasticsearch import Elasticsearch
+from pymongo import MongoClient
 
 from orchestrator.core.celery_app import celery_app
 from orchestrator.core.config import settings
@@ -52,8 +52,8 @@ def scheduled_run() -> dict:
     """
     cfg = _load_schedule_config()
     min_new_logs = cfg.get("min_new_logs", 500)
-
     new_log_count = _count_new_logs()
+
     logger.info("scheduled_run_triggered",
                 new_logs=new_log_count,
                 min_required=min_new_logs)
@@ -75,7 +75,6 @@ def scheduled_run() -> dict:
     config = {"run_icl": True, "run_lora_sft": True, "dry_run": False}
 
     # Record the run in MongoDB before dispatching
-    from pymongo import MongoClient
     client = MongoClient(settings.MONGO_URI)
     db = client[settings.MONGO_DB]
     now = datetime.now(timezone.utc)
@@ -92,7 +91,6 @@ def scheduled_run() -> dict:
     client.close()
 
     start_flywheel_run.delay(run_id, config)
-
     logger.info("scheduled_run_started",
                 run_id=run_id,
                 new_logs=new_log_count)

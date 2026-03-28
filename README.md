@@ -46,9 +46,24 @@ The result: models that get cheaper and faster over time without sacrificing acc
 |---|---|---|
 | Local dev (no GPU) | Docker + 8GB RAM | ICL only — LoRA SFT runs 10 steps as a smoke test |
 | Full LoRA SFT | NVIDIA GPU (4GB+ VRAM) | Runs all 500 training steps with 4-bit quantization |
-| Recommended | Google Colab T4 or better | Free tier sufficient for Qwen 2.5 0.5B–3B |
+| Recommended | NVIDIA T4 or better | Free Colab T4 sufficient for Qwen 2.5 0.5B–3B |
+| Tested | NVIDIA H100 80GB HBM3 | Full end-to-end cycle completes in ~40-50 minutes |
 
-LoRA SFT training detects the available hardware automatically — on CPU it runs 10 steps to validate the pipeline, on GPU it runs the full training job.
+LoRA SFT training detects the available hardware automatically — on CPU it runs 10 steps to validate the pipeline, on GPU it runs the full training job with 4-bit quantization.
+
+### End-to-end timing (H100 80GB)
+
+| Stage | Time |
+|---|---|
+| Curation | ~30s |
+| LoRA SFT — Qwen 2.5 0.5B (500 steps) | ~2 min |
+| LoRA SFT — Qwen 2.5 1.5B (500 steps) | ~5 min |
+| LoRA SFT — Qwen 2.5 3B (500 steps) | ~10 min |
+| Evaluation (6 experiments × 64 samples) | ~20-30 min |
+| Promotion | ~1s |
+| **Total** | **~40-50 min** |
+
+Evaluation time is dominated by Groq API rate limits, not compute.
 
 ---
 
@@ -224,6 +239,26 @@ make test-all  # unit + integration (requires make up)
 ```bash
 bash infra/scripts/reset.sh   # wipe all local state and volumes
 ```
+
+---
+
+## Screenshots
+
+### GPU Setup — NVIDIA H100 80GB detected and verified
+
+![GPU Setup](docs/screenshots/gpu_setup.png)
+
+### Services — all 8 containers healthy and running
+
+![Services](docs/screenshots/services_up.png)
+
+### LoRA SFT Training — Qwen 2.5 0.5B on H100 at 3.6 it/s
+
+![Training](docs/screenshots/lora_training.png)
+
+### Promotion — model promoted with accuracy=1.0, latency p95=750ms
+
+![Promotion](docs/screenshots/promotion.png)
 
 ---
 
