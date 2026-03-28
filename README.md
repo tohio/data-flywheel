@@ -46,8 +46,8 @@ The result: models that get cheaper and faster over time without sacrificing acc
 |---|---|---|
 | Local dev (no GPU) | Docker + 8GB RAM | ICL only — LoRA SFT runs 10 steps as a smoke test |
 | Full LoRA SFT | NVIDIA GPU (4GB+ VRAM) | Runs all 500 training steps with 4-bit quantization |
-| Recommended | NVIDIA T4 or better | Free Colab T4 sufficient for Qwen 2.5 0.5B–3B |
-| Tested | NVIDIA H100 80GB HBM3 | Full end-to-end cycle completes in ~40-50 minutes |
+| Recommended | NVIDIA T4 or better | Sufficient for Qwen 2.5 0.5B–3B |
+| Tested on | NVIDIA H100 80GB HBM3 | Lightning.ai (Nebius) — full cycle ~40-50 minutes |
 
 LoRA SFT training detects the available hardware automatically — on CPU it runs 10 steps to validate the pipeline, on GPU it runs the full training job with 4-bit quantization.
 
@@ -71,43 +71,80 @@ Evaluation time is dominated by Groq API rate limits, not compute.
 
 ```
 data-flywheel/
-├── orchestrator/
-│   ├── main.py                      FastAPI app entrypoint
-│   ├── api/
-│   │   ├── routes/                  flywheel · experiments · models · health
-│   │   └── models/                  Pydantic request/response schemas
-│   ├── core/
-│   │   ├── config.py                Settings (pydantic-settings)
-│   │   ├── database.py              MongoDB + Elasticsearch clients
-│   │   ├── celery_app.py            Celery + Redis configuration
-│   │   └── flywheel_loop.py         Celery chain orchestrator
-│   ├── services/
-│   │   ├── curator/                 pipeline · filters · dedup
-│   │   ├── customizer/              lora_sft · hf_client
-│   │   ├── evaluator/               judge · metrics · benchmarks
-│   │   └── deployment/              manager · registry · groq_client
-│   ├── workers/                     curate · finetune · evaluate · promote
-│   └── utils/                       logging · mlflow
 ├── configs/
-│   ├── flywheel.yaml                schedule · curation thresholds
-│   ├── models.yaml                  teacher + candidate model definitions
-│   └── eval_criteria.yaml           promotion criteria
+│   ├── eval_criteria.yaml        — promotion thresholds (accuracy, latency, cost)
+│   ├── flywheel.yaml             — cron schedule, curation settings, training config
+│   └── models.yaml               — teacher model + candidate definitions
+├── docs/
+│   ├── api_reference.md
+│   ├── architecture.md
+│   ├── architecture.svg
+│   ├── flywheel_loop.md
+│   └── screenshots/              — gpu_setup, services_up, lora_training, promotion, tests
 ├── infra/
-│   ├── docker/                      Dockerfile · docker-compose (dev)
-│   └── scripts/                     setup · seed · reset · gpu_setup
+│   ├── docker/
+│   │   ├── docker-compose.yml    — all services + GPU deploy block + hf_cache volume
+│   │   ├── Dockerfile.orchestrator
+│   │   └── Dockerfile.worker
+│   └── scripts/
+│       ├── gpu_setup.sh          — one-command GPU instance setup
+│       ├── reset.sh              — wipe all data and volumes
+│       ├── seed_logs.py          — seed 1000 synthetic inference logs
+│       └── setup.sh
 ├── notebooks/
-│   ├── exploration.ipynb            inspect raw logs, filter drop rates, quality scores
-│   ├── evaluation_analysis.ipynb    judge scores, latency/cost tradeoffs per model
-│   └── flywheel_results.ipynb       improvement across cycles, promotion history
+│   ├── architecture_walkthrough.ipynb  — guided tour of all 8 components
+│   ├── evaluation_analysis.ipynb       — judge scores, latency/cost tradeoffs
+│   ├── exploration.ipynb               — raw logs, filter drop rates, quality scores
+│   └── flywheel_results.ipynb          — improvement across cycles, promotion history
+├── orchestrator/
+│   ├── api/
+│   │   ├── models/               — Pydantic request/response schemas
+│   │   └── routes/               — flywheel, experiments, models, health endpoints
+│   ├── core/
+│   │   ├── celery_app.py         — Celery application + broker config
+│   │   ├── config.py             — settings from environment variables
+│   │   ├── database.py           — MongoDB async client
+│   │   └── flywheel_loop.py      — start_flywheel_run + resume_flywheel_run tasks
+│   ├── services/
+│   │   ├── curator/
+│   │   │   ├── dedup.py          — MinHash LSH near-deduplication
+│   │   │   ├── filters.py        — quality scoring, PII redaction, length filtering
+│   │   │   └── pipeline.py       — full curation orchestration
+│   │   ├── customizer/
+│   │   │   ├── hf_client.py      — HuggingFace Hub dataset upload + adapter push
+│   │   │   └── lora_sft.py       — ICL registration + LoRA SFT via TRL + PEFT
+│   │   ├── deployment/
+│   │   │   ├── groq_client.py    — Groq inference client
+│   │   │   ├── manager.py        — deployment manager
+│   │   │   └── registry.py       — model registry read/write
+│   │   └── evaluator/
+│   │       ├── benchmarks.py     — EvaluationSuite orchestrating metrics + judge
+│   │       ├── judge.py          — LLM-as-judge scoring via Groq
+│   │       └── metrics.py        — latency + cost measurement, MetricsSummary
+│   ├── utils/
+│   │   ├── elasticsearch.py
+│   │   ├── logging.py            — structured logging via structlog
+│   │   └── mlflow_client.py      — MLflow experiment tracking helpers
+│   ├── workers/
+│   │   ├── curate.py             — Stage 1: curation Celery task
+│   │   ├── evaluate.py           — Stage 3: evaluation Celery task
+│   │   ├── finetune.py           — Stage 2: finetuning Celery task
+│   │   ├── promote.py            — Stage 4: promotion Celery task
+│   │   └── scheduled.py          — Celery Beat scheduled entry point
+│   └── main.py                   — FastAPI app + router registration
 ├── tests/
-│   ├── unit/                        curator · evaluator (no services needed)
-│   └── integration/                 full API lifecycle
-├── .env.sample
-├── requirements.txt
-└── Makefile
+│   ├── integration/
+│   │   └── test_flywheel_loop.py
+│   └── unit/
+│       ├── test_curator.py       — FilterPipeline + MinHashDeduplicator tests
+│       ├── test_evaluator.py     — MetricsCollector + LLMJudge + promotion criteria
+│       └── test_scheduled.py     — Celery Beat scheduled run tests
+├── Makefile                      — up, down, seed, run-flywheel, resume-flywheel, test, lint
+├── pyproject.toml
+├── requirements.txt              — torch==2.4.0 pinned for CUDA 12.4 compatibility
+└── requirements-dev.txt
 ```
 
----
 
 ## API Keys Required
 
@@ -184,38 +221,35 @@ make run-flywheel  # POST /flywheel/run — triggers a full cycle
 
 ---
 
-### Cloud GPU (Google Colab, Lambda Labs, Vast.ai, RunPod)
+### Cloud GPU (Lightning.ai, Lambda Labs, Vast.ai, RunPod)
 
 Any Ubuntu cloud GPU instance works. The setup script installs Docker and the NVIDIA Container Toolkit automatically.
 
-| Provider | Free Tier | Notes |
-|---|---|---|
-| Google Colab | Yes (T4) | Sessions expire — re-run setup each time |
-| Lambda Labs | No | Persistent storage, A10, A100 available |
-| Vast.ai | No | Cheapest hourly GPU rates |
-| RunPod | No | Good A40/A100 availability |
+| Provider | Notes |
+|---|---|
+| Lightning.ai (Nebius) | Tested — H100 80GB available, persistent storage |
+| Lambda Labs | Persistent storage, A10, A100, H100 available |
+| Vast.ai | Cheapest hourly GPU rates |
+| RunPod | Good A40/A100/H100 availability |
 
 ```bash
-# In a Colab terminal (Runtime → Connect to a hosted runtime → T4 GPU)
 git clone https://github.com/tohio/data-flywheel
 cd data-flywheel
 bash infra/scripts/gpu_setup.sh
 ```
 
-`gpu_setup.sh` verifies the GPU, installs Docker and the NVIDIA Container Toolkit, creates `.env`, starts all services, and waits for the API to be healthy.
+`gpu_setup.sh` verifies the GPU, installs Docker and the NVIDIA Container Toolkit, starts all services, and waits for the API to be healthy.
 
 ```bash
 make seed          # seed Elasticsearch with synthetic inference logs
 make run-flywheel  # triggers a full cycle including GPU LoRA SFT
 ```
 
-> **Note:** Colab sessions expire. Re-run `gpu_setup.sh` on each new session. Data persists in Docker volumes for the duration of the session.
-
 ---
 
 ### Any NVIDIA GPU
 
-The compose file requests `count: 1, driver: nvidia` — it uses whatever GPU is available on the host. Works on T4, A10G, A100, V100, or any NVIDIA GPU without any config changes.
+The compose file requests `count: 1, driver: nvidia` — it uses whatever GPU is available on the host. Works on T4, A10G, A100, H100, V100, or any NVIDIA GPU without config changes.
 
 ---
 
